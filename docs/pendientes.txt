@@ -1,0 +1,13 @@
+seccionar bien en las semanas
+que sea bien candelarizado
+
+agregar o editar articulos en la edit_window
+eliminar devoluciones en historial
+corregir lo de las asignaciones
+total en los puntos de la grafica
+agregar estado de devolucion
+una tabla general que muestre folios tambien
+en reportes añadir una sub pestaña de motivos
+añadir una pestaña de vendedores 
+Eportar excel con graficas
+Ver como moverle los visuales

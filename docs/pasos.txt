@@ -1,0 +1,2 @@
+
+¿Seguimos con `base_chart.py` o prefieres ver primero **GeneralView completo**?

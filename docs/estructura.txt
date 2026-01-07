@@ -1,0 +1,174 @@
+ReporteSurtido/
+│
+├── docs/                                      # 📄 DOCUMENTACIÓN
+│   ├── estructura.txt                         # Explicación de capas y flujo
+│   ├── decisiones_ui.txt                      # Lineamientos visuales (Plotly)
+│   ├── convenciones_codigo.txt                # Naming, responsabilidades
+│   └── pendientes.txt                         # Backlog técnico
+│
+├── domain/                                    # 🧠 DOMINIO PURO
+│   ├── __init__.py
+│   ├── devoluciones.py                        # Entidad Devolución
+│   ├── personal.py                            # Entidad Persona
+│   ├── productos.py                           # Entidad Producto
+│   └── vendedores.py                          # Entidad Vendedor
+│
+│   # ❌ Mongo
+│   # ❌ pandas
+│   # ❌ Tkinter
+│
+├── db/                                        # 🔌 ACCESO A DATOS
+│   ├── __init__.py
+│   ├── base.py                                # Interfaces BaseDB
+│   ├── factory.py                             # Factory repos
+│   │
+│   └── mongo/                                 # Implementación MongoDB
+│       ├── __init__.py
+│       ├── client.py                          # Conexión MongoClient
+│       ├── collections.py                     # Nombres de colecciones
+│       ├── indexes.py                         # Índices
+│       │
+│       ├── repos/                             # CRUD por entidad
+│       │   ├── __init__.py
+│       │   ├── devoluciones_repo.py
+│       │   ├── personal_repo.py
+│       │   ├── vendedores_repo.py
+│       │   └── productos_repo.py
+│       │
+│       └── reportes/                          # 🧮 Mongo PURO (aggregations)
+│           ├── __init__.py
+│           ├── filtros.py                     # $match dinámico
+│           ├── pipelines.py                   # $unwind / $group
+│           ├── kpis.py                        # KPIs Mongo
+│           └── queries.py                     # aggregate() → DataFrame
+│
+├── services/                                  # ⚙️ CASOS DE USO
+│   ├── __init__.py
+│   │
+│   ├── personal_service.py
+│   ├── productos_service.py
+│   ├── vendedores_service.py
+│   │
+│   ├── reportes/                              # 📊 LÓGICA DE REPORTES
+│   │   ├── __init__.py
+│   │   ├── service.py                         # Fachada principal
+│   │   ├── queries.py                         # Normalización base
+│   │   ├── filtros.py                         # UI → dominio
+│   │   ├── periodo.py                         # Día / semana / mes
+│   │   ├── aggregations.py                    # Agrupaciones pandas
+│   │   ├── kpis.py                            # KPIs finales
+│   │   └── export.py                          # Excel / CSV / PDF
+│   │
+│   └── devoluciones/                          # 🧾 DEVOLUCIONES
+│       ├── __init__.py
+│       ├── facade.py                          # Fachada pública
+│       │
+│       ├── commands/                          # Escritura
+│       │   ├── __init__.py
+│       │   ├── crear_devolucion.py
+│       │   ├── actualizar_devolucion.py
+│       │   ├── cambiar_estatus.py
+│       │   └── eliminar_devolucion.py
+│       │
+│       ├── queries/                           # Lectura
+│       │   ├── __init__.py
+│       │   ├── listar_historial.py
+│       │   ├── obtener_articulos.py
+│       │   └── obtener_completa.py
+│       │
+│       └── mappers/                           # Adaptadores
+│           ├── __init__.py
+│           ├── articulo_mapper.py
+│           └── devolucion_mapper.py
+│
+├── ui/                                        # 🖥️ INTERFAZ (Tkinter)
+│   ├── __init__.py
+│
+│   ├── app/                                   # App principal
+│   │   ├── __init__.py
+│   │   ├── main_window.py
+│   │   ├── menu.py
+│   │   └── state.py
+│
+│   ├── common/                                # Componentes reutilizables
+│   │   ├── __init__.py
+│   │   ├── dialogs.py
+│   │   ├── forms.py
+│   │   ├── tables.py
+│   │   ├── buttons.py
+│   │   └── validators.py
+│
+│   ├── devoluciones/
+│   │   ├── __init__.py
+│   │   ├── registro/
+│   │   │   ├── __init__.py
+│   │   │   ├── screen.py
+│   │   │   ├── form.py
+│   │   │   ├── table.py
+│   │   │   └── events.py
+│   │   │
+│   │   └── historial/
+│   │       ├── __init__.py
+│   │       ├── screen.py
+│   │       ├── filters.py
+│   │       ├── table.py
+│   │       ├── events.py
+│   │       │
+│   │       └── edit/
+│   │           ├── __init__.py
+│   │           ├── dialog.py
+│   │           ├── form.py
+│   │           ├── table.py
+│   │           └── events.py
+│
+│   ├── personal/
+│   │   ├── __init__.py
+│   │   ├── screen.py
+│   │   ├── form.py
+│   │   ├── table.py
+│   │   └── events.py
+│
+│   └── reportes/                              # 📈 DASHBOARD
+│       ├── __init__.py
+│       ├── screen.py                          # Notebook + layout
+│       ├── controller.py                      # Threading / async
+│       ├── state.py                           # Estado UI
+│       │
+│       ├── filters/
+│       │   ├── __init__.py
+│       │   └── panel.py
+│       │
+│       ├── views/                             # QUÉ SE MUESTRA
+│       │   ├── __init__.py
+│       │   ├── general.py
+│       │   ├── pasillos.py
+│       │   ├── zonas.py
+│       │   ├── personas.py
+│       │   └── detalle.py
+│       │
+│       └── renderers/                         # CÓMO SE DIBUJA
+│           ├── __init__.py
+│           ├── base.py                        # Contrato visual
+                webview.py
+│           │
+│           ├── plotly/                        # 🎨 Plotly PRO
+│           │   ├── __init__.py
+│           │   ├── base_chart.py              # Tema + animaciones
+│           │   ├── bar.py                     # Barras
+│           │   ├── line.py                    # Líneas
+│           │   ├── pie.py                     # Pie / Donut
+│           │   ├── kpi.py                     # KPI cards
+│           │   ├── table.py                   # Tablas Plotly
+│           │   └── layout.py                  # Paletas / fuentes
+│           │
+│           └── tk_tables.py                   # Tablas Treeview
+│
+├── utils/                                     # 🔧 UTILIDADES
+│   ├── __init__.py
+│   ├── constants.py
+│   ├── helpers.py
+│   └── scrollframe.py
+│
+├── .env                                       # Variables entorno
+├── requirements.txt                           # Dependencias
+└── main.py                                    # Entry point
