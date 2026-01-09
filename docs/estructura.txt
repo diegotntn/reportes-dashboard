@@ -1,174 +1,150 @@
 ReporteSurtido/
 │
-├── docs/                                      # 📄 DOCUMENTACIÓN
-│   ├── estructura.txt                         # Explicación de capas y flujo
-│   ├── decisiones_ui.txt                      # Lineamientos visuales (Plotly)
-│   ├── convenciones_codigo.txt                # Naming, responsabilidades
-│   └── pendientes.txt                         # Backlog técnico
-│
-├── domain/                                    # 🧠 DOMINIO PURO
-│   ├── __init__.py
-│   ├── devoluciones.py                        # Entidad Devolución
-│   ├── personal.py                            # Entidad Persona
-│   ├── productos.py                           # Entidad Producto
-│   └── vendedores.py                          # Entidad Vendedor
-│
-│   # ❌ Mongo
-│   # ❌ pandas
-│   # ❌ Tkinter
-│
-├── db/                                        # 🔌 ACCESO A DATOS
-│   ├── __init__.py
-│   ├── base.py                                # Interfaces BaseDB
-│   ├── factory.py                             # Factory repos
+├── backend/                         # 🧠 BACKEND (PYTHON)
 │   │
-│   └── mongo/                                 # Implementación MongoDB
-│       ├── __init__.py
-│       ├── client.py                          # Conexión MongoClient
-│       ├── collections.py                     # Nombres de colecciones
-│       ├── indexes.py                         # Índices
-│       │
-│       ├── repos/                             # CRUD por entidad
-│       │   ├── __init__.py
-│       │   ├── devoluciones_repo.py
-│       │   ├── personal_repo.py
-│       │   ├── vendedores_repo.py
-│       │   └── productos_repo.py
-│       │
-│       └── reportes/                          # 🧮 Mongo PURO (aggregations)
-│           ├── __init__.py
-│           ├── filtros.py                     # $match dinámico
-│           ├── pipelines.py                   # $unwind / $group
-│           ├── kpis.py                        # KPIs Mongo
-│           └── queries.py                     # aggregate() → DataFrame
-│
-├── services/                                  # ⚙️ CASOS DE USO
-│   ├── __init__.py
+│   ├── main.py                      # 🚀 Arranque (API)
 │   │
-│   ├── personal_service.py
-│   ├── productos_service.py
-│   ├── vendedores_service.py
+│   ├── docs/
+│   │   ├── arquitectura.md
+│   │   ├── convenciones_codigo.md
+│   │   └── decisiones_api.md
 │   │
-│   ├── reportes/                              # 📊 LÓGICA DE REPORTES
+│   ├── domain/                      # 🧠 DOMINIO PURO
 │   │   ├── __init__.py
-│   │   ├── service.py                         # Fachada principal
-│   │   ├── queries.py                         # Normalización base
-│   │   ├── filtros.py                         # UI → dominio
-│   │   ├── periodo.py                         # Día / semana / mes
-│   │   ├── aggregations.py                    # Agrupaciones pandas
-│   │   ├── kpis.py                            # KPIs finales
-│   │   └── export.py                          # Excel / CSV / PDF
+│   │   ├── devolucion.py
+│   │   ├── producto.py
+│   │   ├── persona.py
+│   │   └── vendedor.py
 │   │
-│   └── devoluciones/                          # 🧾 DEVOLUCIONES
-│       ├── __init__.py
-│       ├── facade.py                          # Fachada pública
-│       │
-│       ├── commands/                          # Escritura
-│       │   ├── __init__.py
-│       │   ├── crear_devolucion.py
-│       │   ├── actualizar_devolucion.py
-│       │   ├── cambiar_estatus.py
-│       │   └── eliminar_devolucion.py
-│       │
-│       ├── queries/                           # Lectura
-│       │   ├── __init__.py
-│       │   ├── listar_historial.py
-│       │   ├── obtener_articulos.py
-│       │   └── obtener_completa.py
-│       │
-│       └── mappers/                           # Adaptadores
-│           ├── __init__.py
-│           ├── articulo_mapper.py
-│           └── devolucion_mapper.py
+│   │   # ❌ No Mongo
+│   │   # ❌ No FastAPI
+│   │   # ❌ No pandas
 │
-├── ui/                                        # 🖥️ INTERFAZ (Tkinter)
-│   ├── __init__.py
-│
-│   ├── app/                                   # App principal
+│   ├── db/                          # 🔌 INFRAESTRUCTURA
 │   │   ├── __init__.py
-│   │   ├── main_window.py
-│   │   ├── menu.py
-│   │   └── state.py
-│
-│   ├── common/                                # Componentes reutilizables
-│   │   ├── __init__.py
-│   │   ├── dialogs.py
-│   │   ├── forms.py
-│   │   ├── tables.py
-│   │   ├── buttons.py
-│   │   └── validators.py
-│
-│   ├── devoluciones/
-│   │   ├── __init__.py
-│   │   ├── registro/
-│   │   │   ├── __init__.py
-│   │   │   ├── screen.py
-│   │   │   ├── form.py
-│   │   │   ├── table.py
-│   │   │   └── events.py
+│   │   ├── base.py                  # Interfaces DB
+│   │   ├── factory.py               # get_db()
 │   │   │
-│   │   └── historial/
-│   │       ├── __init__.py
-│   │       ├── screen.py
-│   │       ├── filters.py
-│   │       ├── table.py
-│   │       ├── events.py
+│   │   └── mongo/
+│   │       ├── client.py
 │   │       │
-│   │       └── edit/
-│   │           ├── __init__.py
-│   │           ├── dialog.py
-│   │           ├── form.py
-│   │           ├── table.py
-│   │           └── events.py
-│
-│   ├── personal/
+│   │       ├── repos/               # CRUD
+│   │       │   ├── productos_repo.py
+│   │       │   ├── devoluciones_repo.py
+│   │       │   ├── personal_repo.py
+│   │       │   └── vendedores_repo.py
+│   │       │
+│   │       └── reportes/            # LECTURA PESADA
+│   │           ├── queries.py
+│   │           └── filtros.py
+│   │
+│   ├── services/                    # ⚙️ LÓGICA DE NEGOCIO
 │   │   ├── __init__.py
-│   │   ├── screen.py
-│   │   ├── form.py
-│   │   ├── table.py
-│   │   └── events.py
+│   │   │
+│   │   ├── productos_service.py
+
+            vendedores_service.py
+│   │   │
+│   │   ├── devoluciones/
+│   │   │   ├── service.py
+│   │   │   ├── commands.py
+│   │   │   └── dto.py
+│   │   │
+│   │   ├── personal_service.py
+│   │   │
+│   │   ├── reportes/
+│   │   │   ├── service.py
+│   │   │   └── normalizadores.py
+│   │   │
+│   │   └── shared/
+                texto.py
+│   │       ├── fechas.py
+│   │       └── validaciones.py
+│   │
+│   ├── api/                         # 🌐 API REST
+│   │   ├── __init__.py
+│   │   ├── app.py                   # FastAPI app
+│   │   │
+│   │   ├── routes/
+│   │   │   ├── productos.py
+│   │   │   ├── devoluciones.py
+│   │   │   ├── personal.py
+│   │   │   └── reportes.py
+│   │   │
+│   │   ├── schemas/                 # Request / Response
+│   │   │   ├── productos.py
+│   │   │   ├── devoluciones.py
+│   │   │   └── reportes.py
+│   │   │
+│   │   └── dependencies.py          # Inyección services
+│   │
+│   ├── scripts/
+│   │   ├── seed_devoluciones.py
+│   │   └── migraciones.py
+            exportar_excel.py
+           
+            utils/
+                formato.py
+
+│   ├── tests/
+│   │   ├── domain/
+│   │   ├── services/
+│   │   └── api/
+│   │
+│   ├── .env
+│   └── requirements.txt
 │
-│   └── reportes/                              # 📈 DASHBOARD
-│       ├── __init__.py
-│       ├── screen.py                          # Notebook + layout
-│       ├── controller.py                      # Threading / async
-│       ├── state.py                           # Estado UI
-│       │
-│       ├── filters/
-│       │   ├── __init__.py
-│       │   └── panel.py
-│       │
-│       ├── views/                             # QUÉ SE MUESTRA
-│       │   ├── __init__.py
-│       │   ├── general.py
-│       │   ├── pasillos.py
-│       │   ├── zonas.py
-│       │   ├── personas.py
-│       │   └── detalle.py
-│       │
-│       └── renderers/                         # CÓMO SE DIBUJA
-│           ├── __init__.py
-│           ├── base.py                        # Contrato visual
-                webview.py
-│           │
-│           ├── plotly/                        # 🎨 Plotly PRO
-│           │   ├── __init__.py
-│           │   ├── base_chart.py              # Tema + animaciones
-│           │   ├── bar.py                     # Barras
-│           │   ├── line.py                    # Líneas
-│           │   ├── pie.py                     # Pie / Donut
-│           │   ├── kpi.py                     # KPI cards
-│           │   ├── table.py                   # Tablas Plotly
-│           │   └── layout.py                  # Paletas / fuentes
-│           │
-│           └── tk_tables.py                   # Tablas Treeview
+├── frontend/                        # 🎨 FRONTEND WEB
+│   │
+│   ├── index.html                   # Dashboard principal
+│   │
+│   ├── assets/
+│   │   ├── css/
+│   │   │   ├── reset.css
+│   │   │   ├── variables.css
+│   │   │   └── main.css
+│   │   │
+│   │   ├── js/
+│   │   │   ├── api.js               # Fetch wrapper
+│   │   │   ├── state.js             # Estado global
+│   │   │   ├── router.js            # Navegación SPA
+│   │   │   │
+│   │   │   ├── modules/
+│   │   │   │   ├── productos.js
+│   │   │   │   ├── devoluciones/
+                        ├── index.js            # módulo orquestador
+                        ├── historial.js        # listado
+                        ├── registro.js         # alta
+                        └── edicion.js          # edición
+│   │   │   │   ├── personal.js
+│   │   │   │   └── reportes/
+                    ├── index.js        ← orquestador (ReportesScreen)
+                    ├── general.js      ← GeneralView
+                    ├── pasillos.js     ← PasillosView
+                    ├── personas.js     ← PersonasView
+                    ├── zonas.js        ← ZonasView
+                    └── detalle.js      ← DetalleView
+│   │   │   │
+│   │   │   └── charts.js            # Gráficas (Chart.js / Plotly)
+│   │   │
+│   │   └── img/
+│   │
+│   ├── views/                       # HTML parciales
+│   │   ├── productos.html
+│   │   ├── devoluciones.html
+            devoluciones_historial.html 
+            devoluciones_registro.html  
+│   │   ├── personal.html
+│   │   └── reportes.html
+│   │
+│   └── components/
+│       ├── navbar.html
+│       ├── filters.html
+│       └── table.html
+        ├── registro_form.html              ← RegistroForm
+    │   ├── articulo_form.html              ← ArticuloForm
+    │   └── articulos_table.html            ← ArticulosTable
 │
-├── utils/                                     # 🔧 UTILIDADES
-│   ├── __init__.py
-│   ├── constants.py
-│   ├── helpers.py
-│   └── scrollframe.py
-│
-├── .env                                       # Variables entorno
-├── requirements.txt                           # Dependencias
-└── main.py                                    # Entry point
+├── docker-compose.yml               # (Opcional)
+├── README.md
+└── .gitignore

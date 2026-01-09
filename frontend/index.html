@@ -1,0 +1,69 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8" />
+  <title>ReporteSurtido · Dashboard</title>
+
+  <!-- SEO básico -->
+  <meta
+    name="description"
+    content="Dashboard de reportes de surtido, devoluciones, productos y personal."
+  />
+
+  <!-- Responsive -->
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+
+  <!-- Tipografía -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link
+    href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;600&display=swap"
+    rel="stylesheet"
+  />
+
+  <!-- Estilos -->
+  <link rel="stylesheet" href="./assets/css/main.css" />
+</head>
+
+<body>
+
+  <!-- ───────── Header ───────── -->
+  <header class="app-header">
+    <div class="app-header__content">
+      <h1 class="app-title">Reporte de Surtido</h1>
+      <p class="app-subtitle">
+        Control y análisis de productos, personal y devoluciones
+      </p>
+    </div>
+  </header>
+
+  <!-- ───────── Navegación principal ───────── -->
+  <nav class="app-nav" role="navigation">
+    <button class="nav-button" data-route="reportes">Reportes</button>
+    <button class="nav-button" data-route="productos">Productos</button>
+    <button class="nav-button" data-route="personal">Personal</button>
+    <button class="nav-button" data-route="devoluciones">Devoluciones</button>
+  </nav>
+
+  <!-- ───────── Contenedor SPA ───────── -->
+  <main id="main-content" class="app-main" role="main">
+    <!-- El router inyecta aquí las vistas -->
+  </main>
+
+  <!-- ───────── Footer ───────── -->
+  <footer class="app-footer">
+    <small>© 2026 · ReporteSurtido</small>
+  </footer>
+
+  <!-- ───────── Librerías externas (GLOBAL) ───────── -->
+  <!-- Chart.js UMD LOCAL: expone `Chart` global -->
+  <script src="/assets/lib/chartjs/chart.umd.min.js"></script>
+
+  <!-- ───────── Arranque de la SPA (ES Modules) ───────── -->
+  <script type="module">
+    import { iniciarRouter } from './assets/js/router.js';
+    iniciarRouter();
+  </script>
+
+</body>
+</html>

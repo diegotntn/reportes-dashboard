@@ -1,0 +1,51 @@
+<section class="card card--soft">
+  <header class="card__header">
+    <h3>Datos de la devolución</h3>
+  </header>
+
+  <div class="card__body">
+    <div class="grid grid--3">
+
+      <div class="field">
+        <label for="reg-fecha">Fecha</label>
+        <input
+          type="date"
+          id="reg-fecha"
+          name="fecha"
+          required
+        />
+      </div>
+
+      <div class="field">
+        <label for="reg-vendedor">Vendedor</label>
+        <input
+          type="text"
+          id="reg-vendedor"
+          name="vendedor_id"
+          placeholder="ID o nombre"
+        />
+      </div>
+
+      <div class="field">
+        <label for="reg-zona">Zona</label>
+        <input
+          type="text"
+          id="reg-zona"
+          name="zona"
+          placeholder="Ej. Norte"
+        />
+      </div>
+
+    </div>
+
+    <div class="field">
+      <label for="reg-observaciones">Observaciones</label>
+      <textarea
+        id="reg-observaciones"
+        name="observaciones"
+        rows="3"
+        placeholder="Notas adicionales sobre la devolución"
+      ></textarea>
+    </div>
+  </div>
+</section>

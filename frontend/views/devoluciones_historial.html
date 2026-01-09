@@ -1,0 +1,21 @@
+<section class="card">
+  <header class="card__header">
+    <div>
+      <h2>Historial de devoluciones</h2>
+      <p class="muted">Consulta y edita devoluciones registradas</p>
+    </div>
+
+    <button id="btn-refresh" class="btn">Actualizar historial</button>
+  </header>
+
+  <!-- Filtros (equiv. HistorialFilters) -->
+  <div id="filters-container"></div>
+
+  <!-- Tabla -->
+  <div id="table-container"></div>
+
+  <!-- Estados -->
+  <div id="historial-loading" class="state" hidden>Cargando…</div>
+  <div id="historial-empty" class="state" hidden>No hay devoluciones</div>
+  <div id="historial-error" class="state error" hidden></div>
+</section>
