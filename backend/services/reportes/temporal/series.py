@@ -3,69 +3,87 @@ import pandas as pd
 
 
 # ======================================================
-# Utilidades internas
+# Helpers internos
 # ======================================================
 
-def _to_dataframe(raw: list[dict]) -> pd.DataFrame:
-    if not raw:
-        return pd.DataFrame()
-
-    df = pd.DataFrame(raw)
-
-    if "fecha" not in df.columns:
-        raise ValueError("Se requiere columna 'fecha'")
-
-    df["fecha"] = pd.to_datetime(df["fecha"], errors="coerce")
-    df = df.dropna(subset=["fecha"])
-
-    return df
-
-
-def _metricas(df: pd.DataFrame) -> list[str]:
-    return [c for c in df.columns if c != "fecha"]
-
-
-def _empty(labels: list[str], metricas: list[str]) -> dict:
+def _punto_vacio(key: str, label: str) -> dict:
     return {
-        "labels": labels,
-        "series": {m: [0] * len(labels) for m in metricas}
+        "key": key,
+        "label": label,
+        "kpis": {
+            "importe": 0,
+            "piezas": 0,
+            "devoluciones": 0,
+        },
+        "personas": []
+    }
+
+
+def _construir_punto(key: str, label: str, bloque: pd.DataFrame) -> dict:
+    personas = []
+
+    for pid, p in bloque.groupby("persona_id", dropna=False):
+        personas.append({
+            "id": pid,
+            "nombre": p["persona_nombre"].iloc[0],
+            "kpis": {
+                "importe": float(p["importe"].sum()),
+                "piezas": int(p["piezas"].sum()),
+                "devoluciones": int(p["devoluciones"].sum()),
+            }
+        })
+
+    return {
+        "key": key,
+        "label": label,
+        "kpis": {
+            "importe": float(bloque["importe"].sum()),
+            "piezas": int(bloque["piezas"].sum()),
+            "devoluciones": int(bloque["devoluciones"].sum()),
+        },
+        "personas": personas
     }
 
 
 # ======================================================
-# NORMALIZACIÓN POR DÍA
+# SERIE POR DÍA
 # ======================================================
 
-def normalizar_por_dia(raw, desde: date, hasta: date):
-    df = _to_dataframe(raw)
+def serie_por_dia(df: pd.DataFrame, desde: date, hasta: date) -> list[dict]:
+    if df is None or df.empty:
+        return []
 
-    dias = pd.date_range(desde, hasta, freq="D")
-    labels = dias.strftime("%Y-%m-%d").tolist()
+    df = df.copy()
+    df["dia"] = df["fecha"].dt.date
 
-    if df.empty:
-        return _empty(labels, [])
+    salida = []
 
-    metricas = _metricas(df)
+    for d in pd.date_range(desde, hasta, freq="D").date:
+        bloque = df[df["dia"] == d]
 
-    df = (
-        df.set_index("fecha")
-        .reindex(dias, fill_value=0)
-        .reset_index(drop=True)
-    )
+        if bloque.empty:
+            salida.append(_punto_vacio(str(d), str(d)))
+        else:
+            salida.append(
+                _construir_punto(str(d), str(d), bloque)
+            )
 
-    return {
-        "labels": labels,
-        "series": {m: df[m].tolist() for m in metricas}
-    }
+    return salida
 
 
 # ======================================================
-# NORMALIZACIÓN POR SEMANA
-# (label = lunes de cada semana, ISO)
+# SERIE POR SEMANA (ISO - lunes)
 # ======================================================
 
-def normalizar_por_semana(raw, desde: date, hasta: date):
-    df = _to_dataframe(raw)
+def serie_por_semana(df: pd.DataFrame, desde: date, hasta: date) -> list[dict]:
+    if df is None or df.empty:
+        return []
+
+    df = df.copy()
+    df["semana"] = (
+        df["fecha"] -
+        pd.to_timedelta(df["fecha"].dt.weekday, unit="D")
+    ).dt.date
 
     inicio = pd.to_datetime(desde) - pd.to_timedelta(
         pd.to_datetime(desde).weekday(), unit="D"
@@ -74,84 +92,76 @@ def normalizar_por_semana(raw, desde: date, hasta: date):
         6 - pd.to_datetime(hasta).weekday(), unit="D"
     )
 
-    semanas = pd.date_range(inicio, fin, freq="W-MON")
-    labels = semanas.strftime("%Y-%m-%d").tolist()  # ✅ ISO
+    salida = []
 
-    if df.empty:
-        return _empty(labels, [])
+    for s in pd.date_range(inicio, fin, freq="W-MON").date:
+        bloque = df[df["semana"] == s]
 
-    metricas = _metricas(df)
+        label = f"Semana {s}"
 
-    df["_semana"] = df["fecha"] - pd.to_timedelta(
-        df["fecha"].dt.weekday, unit="D"
-    )
+        if bloque.empty:
+            salida.append(_punto_vacio(str(s), label))
+        else:
+            salida.append(
+                _construir_punto(str(s), label, bloque)
+            )
 
-    agrupado = (
-        df.groupby("_semana")[metricas]
-        .sum()
-        .reindex(semanas, fill_value=0)
-    )
-
-    return {
-        "labels": labels,
-        "series": {m: agrupado[m].tolist() for m in metricas}
-    }
+    return salida
 
 
 # ======================================================
-# NORMALIZACIÓN POR MES
-# (label = YYYY-MM)
+# SERIE POR MES
 # ======================================================
 
-def normalizar_por_mes(raw, desde: date, hasta: date):
-    df = _to_dataframe(raw)
+def serie_por_mes(df: pd.DataFrame, desde: date, hasta: date) -> list[dict]:
+    if df is None or df.empty:
+        return []
 
-    meses = pd.period_range(desde, hasta, freq="M")
-    labels = [str(p) for p in meses]  # ✅ "2025-01"
+    df = df.copy()
+    df["mes"] = df["fecha"].dt.to_period("M")
 
-    if df.empty:
-        return _empty(labels, [])
+    salida = []
 
-    metricas = _metricas(df)
+    for m in pd.period_range(desde, hasta, freq="M"):
+        bloque = df[df["mes"] == m]
 
-    df["_mes"] = df["fecha"].dt.to_period("M")
+        key = str(m)
+        label = str(m)
 
-    agrupado = (
-        df.groupby("_mes")[metricas]
-        .sum()
-        .reindex(meses, fill_value=0)
-    )
+        if bloque.empty:
+            salida.append(_punto_vacio(key, label))
+        else:
+            salida.append(
+                _construir_punto(key, label, bloque)
+            )
 
-    return {
-        "labels": labels,
-        "series": {m: agrupado[m].tolist() for m in metricas}
-    }
+    return salida
 
 
 # ======================================================
-# NORMALIZACIÓN POR AÑO
+# SERIE POR AÑO
 # ======================================================
 
-def normalizar_por_anio(raw, desde: date, hasta: date):
-    df = _to_dataframe(raw)
+def serie_por_anio(df: pd.DataFrame, desde: date, hasta: date) -> list[dict]:
+    if df is None or df.empty:
+        return []
 
-    anios = list(range(desde.year, hasta.year + 1))
-    labels = [str(a) for a in anios]  # ✅ "2025"
+    df = df.copy()
+    df["anio"] = df["fecha"].dt.year
 
-    if df.empty:
-        return _empty(labels, [])
+    salida = []
 
-    metricas = _metricas(df)
+    for a in range(desde.year, hasta.year + 1):
+        bloque = df[df["anio"] == a]
 
-    df["_anio"] = df["fecha"].dt.year
+        key = str(a)
+        label = str(a)
 
-    agrupado = (
-        df.groupby("_anio")[metricas]
-        .sum()
-        .reindex(anios, fill_value=0)
-    )
+        if bloque.empty:
+            salida.append(_punto_vacio(key, label))
+        else:
+            salida.append(
+                _construir_punto(key, label, bloque)
+            )
 
-    return {
-        "labels": labels,
-        "series": {m: agrupado[m].tolist() for m in metricas}
-    }
+    return salida

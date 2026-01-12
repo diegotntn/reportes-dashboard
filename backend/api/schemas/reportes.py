@@ -10,12 +10,6 @@ from datetime import date
 class ReportesFiltros(BaseModel):
     """
     Filtros enviados desde el frontend.
-
-    agrupar:
-    - Dia
-    - Semana
-    - Mes
-    - Anio
     """
     desde: date
     hasta: date
@@ -43,14 +37,39 @@ class ResumenKPIs(BaseModel):
 
 
 # ─────────────────────────
-# BLOQUES DE REPORTE
-# (estructura ya procesada)
+# KPI POR PERSONA (tooltip)
+# ─────────────────────────
+
+class PersonaKPI(BaseModel):
+    id: Optional[str]
+    nombre: str
+    kpis: Dict[str, float | int]
+
+
+# ─────────────────────────
+# PUNTO DE SERIE TEMPORAL
+# ─────────────────────────
+
+class PuntoSerie(BaseModel):
+    """
+    Un punto del eje temporal (día / semana / mes / año)
+    """
+    key: str
+    label: str
+    kpis: Dict[str, float | int]
+    personas: List[PersonaKPI]
+
+
+# ─────────────────────────
+# SERIE TEMPORAL RICA
 # ─────────────────────────
 
 class SerieTemporal(BaseModel):
-    labels: List[Any]
-    series: Dict[str, List[Any]]
-    resumen: Optional[Dict[str, Any]] = None
+    """
+    Serie temporal con personas por punto.
+    """
+    periodo: Literal["dia", "semana", "mes", "anio"]
+    serie: List[PuntoSerie]
 
 
 # ─────────────────────────
@@ -64,11 +83,16 @@ class ReporteOut(BaseModel):
     # Resumen global
     resumen: ResumenKPIs
 
-    # Vistas
+    # Serie principal (gráfica)
     general: Optional[SerieTemporal] = None
-    por_zona: Dict[str, SerieTemporal] = {}
-    por_pasillo: Dict[str, SerieTemporal] = {}
-    por_persona: Dict[str, SerieTemporal] = {}
+
+    # Otras vistas (tablas / breakdowns)
+    por_zona: Dict[str, Any] = {}
+    por_pasillo: Dict[str, Any] = {}
+    por_persona: Dict[str, Any] = {}
 
     # Tabla detalle
     tabla: List[Dict[str, Any]] = []
+
+    # Error opcional
+    error: Optional[str] = None

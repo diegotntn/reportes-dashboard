@@ -1,20 +1,18 @@
 /* ======================================================
    charts.js
    Motor gráfico genérico para dashboards
-   Compatible con Chart.js 4 + eje time
+   Chart.js 4.x
+   Soporta:
+   - Serie rica (1 línea)
+   - Multi-serie (comparación)
 ====================================================== */
 
 /* ======================================================
-   Configuración base para Chart.js
-   - Segura para grids (Todos separados)
-   - Compatible con eje time
-   - Estable en resize / zoom
+   CONFIGURACIÓN BASE
 ====================================================== */
 
 const BASE_OPTIONS = {
   responsive: true,
-
-  // 🔒 CLAVE: mantener proporción para evitar loops de resize
   maintainAspectRatio: true,
   aspectRatio: 2.5,
 
@@ -23,9 +21,7 @@ const BASE_OPTIONS = {
     intersect: false
   },
 
-  animation: {
-    duration: 300
-  },
+  animation: { duration: 300 },
 
   plugins: {
     legend: {
@@ -36,10 +32,7 @@ const BASE_OPTIONS = {
         boxWidth: 8,
         padding: 16,
         color: '#374151',
-        font: {
-          size: 12,
-          weight: '500'
-        }
+        font: { size: 12, weight: '500' }
       }
     },
 
@@ -52,10 +45,29 @@ const BASE_OPTIONS = {
       borderWidth: 1,
       borderColor: '#374151',
       displayColors: false,
+
       callbacks: {
+        title(items) {
+          const p = items?.[0]?.raw;
+          return p?.label ?? '';
+        },
+
         label(ctx) {
-          const v = ctx.parsed?.y ?? ctx.parsed;
-          return `${ctx.dataset.label}: ${Number(v).toLocaleString('es-MX')}`;
+          const p = ctx.raw;
+          if (!p?.kpis) return '';
+
+          const lines = [];
+          lines.push(`Total: ${Number(p.kpis.importe || 0).toLocaleString('es-MX')}`);
+
+          if (Array.isArray(p.personas)) {
+            p.personas.forEach(per => {
+              lines.push(
+                `👤 ${per.nombre}: ${Number(per.kpis.importe || 0).toLocaleString('es-MX')}`
+              );
+            });
+          }
+
+          return lines;
         }
       }
     }
@@ -64,45 +76,26 @@ const BASE_OPTIONS = {
   scales: {
     y: {
       beginAtZero: true,
-      grid: {
-        color: '#e5e7eb',
-        drawBorder: false
-      },
-      ticks: {
-        color: '#6b7280',
-        maxTicksLimit: 6
-      }
+      grid: { color: '#e5e7eb', drawBorder: false },
+      ticks: { color: '#6b7280', maxTicksLimit: 6 }
     },
 
     x: {
-      grid: {
-        display: false
-      },
-      ticks: {
-        color: '#6b7280',
-        maxRotation: 0,
-        autoSkip: true
-      }
+      grid: { display: false },
+      ticks: { color: '#6b7280', autoSkip: true }
     }
   }
 };
 
-
 /* ======================================================
-   Utilidades internas
+   HELPERS
 ====================================================== */
 
-/**
- * Destruye la gráfica existente asociada al canvas
- */
 function destroyIfExists(canvas) {
   const chart = Chart.getChart(canvas);
   if (chart) chart.destroy();
 }
 
-/**
- * Ajuste automático de densidad visual
- */
 function adaptDensity(count) {
   if (count > 180) return { maxTicksLimit: 8, pointRadius: 0 };
   if (count > 60)  return { maxTicksLimit: 10, pointRadius: 2 };
@@ -111,75 +104,80 @@ function adaptDensity(count) {
 }
 
 /* ======================================================
-   GRÁFICA DE LÍNEA
-   - Soporta eje categórico y eje time
-   - Convierte labels → {x,y} SOLO si es time
+   DATASET BUILDER
 ====================================================== */
-export function renderLineChart(canvas, labels, datasets, options = {}) {
-  console.log('📐 Chart container size', {
-      canvas: canvas,
-      parent: canvas.parentElement?.getBoundingClientRect()
-    });
+
+function buildDataset(serie, cfg, density) {
+  return {
+    label: cfg.label,
+    borderColor: cfg.color,
+    backgroundColor: cfg.bg,
+    tension: 0.3,
+    fill: cfg.fill ?? true,
+    spanGaps: true,
+    pointRadius: density.pointRadius,
+    pointHoverRadius: density.pointRadius + 2,
+
+    data: serie.map(p => ({
+      x: p.fecha,
+      y: Number(p.kpis?.importe || 0),
+      ...p
+    }))
+  };
+}
+
+/* ======================================================
+   LINE CHART — UNA O VARIAS SERIES
+====================================================== */
+/**
+ * @param canvas HTMLCanvasElement
+ * @param payload {
+ *   periodo: 'dia'|'semana'|'mes'
+ *   series: [
+ *     { label, color, bg, serie[] }
+ *   ]
+ * }
+ */
+export function renderLineChart(canvas, payload, options = {}) {
 
   destroyIfExists(canvas);
 
-  const isTimeScale = options.scales?.x?.type === 'time';
+  if (!payload?.series || payload.series.length === 0) return;
 
-  const totalPoints =
-    datasets?.[0]?.data?.length ??
-    labels?.length ??
-    0;
+  const allPoints = payload.series.reduce((a, s) => a + s.serie.length, 0);
+  const density = adaptDensity(allPoints);
 
-  const { maxTicksLimit, pointRadius } = adaptDensity(totalPoints);
-
-  // 🔁 Normalización de datasets para eje time
-  const preparedDatasets = datasets.map(ds => {
-    if (!isTimeScale) return ds;
-
-    return {
-      ...ds,
-      data: labels.map((label, i) => ({
-        x: label,
-        y: ds.data[i]
-      }))
-    };
-  });
+  const datasets = payload.series.map((s, i) =>
+    buildDataset(s.serie, s, density)
+  );
 
   return new Chart(canvas, {
     type: 'line',
 
-    data: {
-      // ⚠️ labels NO se usan en eje time
-      labels: isTimeScale ? undefined : labels,
-      datasets: preparedDatasets.map(ds => ({
-        tension: 0.3,
-        fill: true,
-        spanGaps: true,
-        pointRadius,
-        pointHoverRadius: pointRadius + 2,
-        ...ds
-      }))
-    },
+    data: { datasets },
 
     options: {
       ...BASE_OPTIONS,
       ...options,
 
       scales: {
-        /* ───────── EJE Y ───────── */
         y: {
-          beginAtZero: true,
-          grid: { color: '#e5e7eb' },
-          ticks: { color: '#6b7280' },
+          ...BASE_OPTIONS.scales.y,
           ...(options.scales?.y || {})
         },
 
-        /* ───────── EJE X ───────── */
         x: {
-          grid: { display: false },
+          type: 'time',
+          time: {
+            unit:
+              payload.periodo === 'dia' ? 'day' :
+              payload.periodo === 'semana' ? 'week' :
+              payload.periodo === 'mes' ? 'month' :
+              'year'
+          },
           ticks: {
-            color: '#6b7280',
-            maxTicksLimit,
+            ...BASE_OPTIONS.scales.x.ticks,
+            maxTicksLimit: density.maxTicksLimit,
             ...(options.scales?.x?.ticks || {})
           },
           ...(options.scales?.x || {})
@@ -190,44 +188,40 @@ export function renderLineChart(canvas, labels, datasets, options = {}) {
 }
 
 /* ======================================================
-   GRÁFICA DE BARRAS
+   BAR CHART (SIN CAMBIOS)
 ====================================================== */
-export function renderBarChart(canvas, labels, datasets, options = {}) {
+
+export function renderBarChart(canvas, general, options = {}) {
 
   destroyIfExists(canvas);
+  if (!general?.serie) return;
 
   return new Chart(canvas, {
     type: 'bar',
-
     data: {
-      labels,
-      datasets: datasets.map(ds => ({
+      labels: general.serie.map(p => p.label),
+      datasets: [{
+        label: 'Importe',
+        data: general.serie.map(p => p.kpis.importe),
         borderRadius: 6,
         maxBarThickness: 48,
-        ...ds
-      }))
+        backgroundColor: '#2563eb'
+      }]
     },
-
-    options: {
-      ...BASE_OPTIONS,
-      ...options,
-      scales: {
-        ...(options.scales || {})
-      }
-    }
+    options: { ...BASE_OPTIONS, ...options }
   });
 }
 
 /* ======================================================
-   GRÁFICA DONUT / PIE
+   DONUT / PIE
 ====================================================== */
+
 export function renderDonutChart(canvas, labels, data, options = {}) {
 
   destroyIfExists(canvas);
 
   return new Chart(canvas, {
     type: 'doughnut',
-
     data: {
       labels,
       datasets: [{
@@ -236,7 +230,6 @@ export function renderDonutChart(canvas, labels, data, options = {}) {
         borderColor: '#ffffff'
       }]
     },
-
     options: {
       responsive: true,
       plugins: {
@@ -249,8 +242,9 @@ export function renderDonutChart(canvas, labels, data, options = {}) {
 }
 
 /* ======================================================
-   RESET DE ZOOM
+   RESET ZOOM
 ====================================================== */
+
 export function resetZoom(canvas) {
   const chart = Chart.getChart(canvas);
   if (chart?.resetZoom) chart.resetZoom();

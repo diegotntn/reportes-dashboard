@@ -2,19 +2,19 @@
 Dependencias de la API (SOLO REPORTES).
 
 RESPONSABILIDAD:
-- Proveer acceso a la base de datos (Mongo, solo lectura)
-- Obtener la colección correcta
-- Construir queries analíticas
-- Inyectar el servicio de reportes
+- Proveer acceso a MongoDB (solo lectura)
+- Inyectar el MongoClientProvider correcto
+- Construir Queries analíticas
+- Inyectar el Service de reportes
 
 NO HACE:
 - CRUD
 - Escritura de datos
 - Lógica de negocio
-- Lógica de agregación
+- Agregaciones analíticas
 
-Aquí vive ÚNICAMENTE la composición del grafo:
-MongoClientProvider → Collection → Queries → Service
+GRAFO CORRECTO:
+MongoClientProvider → ReportesQueries → ReportesService
 """
 
 # ─────────────────────────────────────────
@@ -26,10 +26,12 @@ from backend.db.mongo.client import MongoClientProvider
 
 def get_database() -> MongoClientProvider:
     """
-    Devuelve el proveedor de base de datos.
-    (MongoClientProvider en modo lectura)
+    Devuelve el proveedor Mongo en modo SOLO LECTURA.
     """
-    return get_db()
+    print("\n🔗 [dependencies] get_database()")
+    provider = get_db()
+    print("   ✔ MongoClientProvider listo")
+    return provider
 
 
 # ─────────────────────────────────────────
@@ -40,22 +42,24 @@ from backend.db.mongo.reportes.queries import ReportesQueries
 
 def get_reportes_queries() -> ReportesQueries:
     """
-    Construye el objeto de queries de reportes.
+    Construye las queries analíticas de reportes.
 
-    IMPORTANTE:
-    - Aquí se obtiene la colección
-    - NO se pasa el provider completo
+    ⚠️ CLAVE:
+    - Se inyecta el MongoClientProvider COMPLETO
+    - NO se pasa una colección suelta
     """
-    db = get_database()
+    print("\n🧩 [dependencies] get_reportes_queries()")
 
-    # 🔑 COLECCIÓN REAL (NO el provider)
-    collection = db.get_collection("devoluciones")
+    provider = get_database()
 
-    return ReportesQueries(collection)
+    queries = ReportesQueries(provider)
+
+    print("   ✔ ReportesQueries creado correctamente")
+    return queries
 
 
 # ─────────────────────────────────────────
-# SERVICES (ORQUESTADOR)
+# SERVICE (ORQUESTADOR)
 # ─────────────────────────────────────────
 from backend.services.reportes.service import ReportesService
 
@@ -67,5 +71,11 @@ def get_reportes_service() -> ReportesService:
     Inyecta:
     - ReportesQueries (lectura Mongo)
     """
+    print("\n🧠 [dependencies] get_reportes_service()")
+
     queries = get_reportes_queries()
-    return ReportesService(reportes_queries=queries)
+
+    service = ReportesService(reportes_queries=queries)
+
+    print("   ✔ ReportesService listo")
+    return service

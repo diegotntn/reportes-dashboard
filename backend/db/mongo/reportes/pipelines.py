@@ -5,64 +5,74 @@ REGLAS CLAVE:
 - NUNCA devolver nulls para métricas numéricas
 - El dinero sale normalizado desde Mongo (double)
 - El service NO calcula importes, solo agrega
+- Soporta fecha como Date o String (normalización interna)
 - El casteo de ObjectId SIEMPRE se hace en Python
 """
 
-from bson import ObjectId
-
-
+# ─────────────────────────────────────────────
+# DETALLE ANALÍTICO (BASE DE REPORTES)
 # ─────────────────────────────────────────────
 def pipeline_devoluciones_detalle(filtros: dict) -> list:
     """
-    Pipeline de detalle por artículo (para reportes).
-
-    Salida por documento:
-    - fecha
-    - zona
-    - pasillo
-    - piezas
-    - importe (prorrateado desde el total del documento)
-    - devoluciones (=1)
+    Pipeline ANALÍTICO base.
     """
 
-    return [
-        # ───── Filtro base ─────
-        {"$match": filtros},
+    filtro_fecha = filtros.get("fecha", {})
 
-        # ───── Total de piezas por documento ─────
+    print("\n🧩 [pipeline_devoluciones_detalle]")
+    print("➡ Filtro fecha recibido:", filtro_fecha)
+
+    return [
+        # 1️⃣ Normalizar fecha
+        {
+            "$addFields": {
+                "__fecha": {
+                    "$cond": [
+                        {"$eq": [{"$type": "$fecha"}, "date"]},
+                        "$fecha",
+                        {
+                            "$dateFromString": {
+                                "dateString": "$fecha"
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+
+        # 2️⃣ Match por fecha
+        {
+            "$match": {
+                "__fecha": filtro_fecha
+            }
+        },
+
+        # 3️⃣ Total piezas
         {
             "$addFields": {
                 "total_piezas": {
                     "$sum": {
-                        "$ifNull": ["$articulos.cantidad", []]
+                        "$map": {
+                            "input": {"$ifNull": ["$articulos", []]},
+                            "as": "a",
+                            "in": {"$ifNull": ["$$a.cantidad", 0]}
+                        }
                     }
                 }
             }
         },
 
-        # ───── Expandir artículos ─────
+        # 4️⃣ Unwind
         {"$unwind": "$articulos"},
 
-        # ───── Proyección normalizada ─────
+        # 5️⃣ Proyección
         {
             "$project": {
                 "_id": 0,
-
-                # Dimensiones
-                "fecha": 1,
+                "fecha": "$__fecha",
                 "zona": 1,
-                "pasillo": {
-                    "$ifNull": ["$articulos.pasillo", "—"]
-                },
-
-                # Métricas
-                "piezas": {
-                    "$toInt": {
-                        "$ifNull": ["$articulos.cantidad", 0]
-                    }
-                },
-
-                # ───── IMPORTE PRORRATEADO REAL ─────
+                "pasillo": {"$ifNull": ["$articulos.pasillo", "—"]},
+                "piezas": {"$toInt": {"$ifNull": ["$articulos.cantidad", 0]}},
                 "importe": {
                     "$cond": [
                         {"$gt": ["$total_piezas", 0]},
@@ -74,41 +84,50 @@ def pipeline_devoluciones_detalle(filtros: dict) -> list:
                                         {"$toDouble": "$total_piezas"}
                                     ]
                                 },
-                                {
-                                    "$toDouble": {
-                                        "$ifNull": ["$total", 0]
-                                    }
-                                }
+                                {"$toDouble": {"$ifNull": ["$total", 0]}}
                             ]
                         },
                         0.0
                     ]
                 },
-
-                # Indicador
-                "devoluciones": {"$literal": 1},
+                "devoluciones": {"$literal": 1}
             }
-        },
+        }
     ]
 
-
+# ─────────────────────────────────────────────
+# RESUMEN POR DEVOLUCIÓN
 # ─────────────────────────────────────────────
 def pipeline_devoluciones_resumen(filtros: dict) -> list:
-    return [
-        {"$match": filtros},
+    filtro_fecha = filtros.get("fecha", {})
 
-        # Extraer pasillos únicos desde artículos
+    print("\n🧩 [pipeline_devoluciones_resumen]")
+    print("➡ Filtro fecha recibido:", filtro_fecha)
+
+    return [
+        {
+            "$addFields": {
+                "__fecha": {
+                    "$cond": [
+                        {"$eq": [{"$type": "$fecha"}, "date"]},
+                        "$fecha",
+                        {"$dateFromString": {"dateString": "$fecha"}}
+                    ]
+                }
+            }
+        },
+
+        {"$match": {"__fecha": filtro_fecha}},
+
         {
             "$addFields": {
                 "pasillos": {
                     "$setUnion": [
                         {
                             "$map": {
-                                "input": "$articulos",
+                                "input": {"$ifNull": ["$articulos", []]},
                                 "as": "a",
-                                "in": {
-                                    "$ifNull": ["$$a.pasillo", None]
-                                }
+                                "in": {"$ifNull": ["$$a.pasillo", None]}
                             }
                         },
                         []
@@ -120,15 +139,12 @@ def pipeline_devoluciones_resumen(filtros: dict) -> list:
         {
             "$project": {
                 "_id": 0,
-                "id": 1,                # UUID de negocio
-                "fecha": 1,
+                "fecha": "$__fecha",
                 "folio": 1,
                 "cliente": 1,
                 "zona": 1,
                 "motivo": 1,
                 "estatus": 1,
-
-                # Convertir pasillos a texto
                 "pasillos": {
                     "$reduce": {
                         "input": "$pasillos",
@@ -142,27 +158,27 @@ def pipeline_devoluciones_resumen(filtros: dict) -> list:
                         }
                     }
                 },
-
-                "total": {
-                    "$toDouble": {
-                        "$ifNull": ["$total", 0]
-                    }
-                },
+                "total": {"$toDouble": {"$ifNull": ["$total", 0]}}
             }
         },
 
-        {"$sort": {"fecha": -1, "folio": -1}},
+        {"$sort": {"fecha": -1}}
     ]
 
 
 # ─────────────────────────────────────────────
+# ARTÍCULOS DE UNA DEVOLUCIÓN
+# ─────────────────────────────────────────────
 def pipeline_devolucion_articulos(devolucion_id: str) -> list:
+    print("\n🧩 [pipeline_devolucion_articulos]")
+    print("➡ devolucion_id:", devolucion_id)
+
     return [
         {
             "$match": {
                 "$or": [
                     {"id": devolucion_id},
-                    {"_id": devolucion_id}  # por si algún registro viejo
+                    {"_id": devolucion_id}
                 ]
             }
         },
@@ -170,25 +186,11 @@ def pipeline_devolucion_articulos(devolucion_id: str) -> list:
         {
             "$project": {
                 "_id": 0,
-                "nombre": {
-                    "$ifNull": ["$articulos.nombre", ""]
-                },
-                "codigo": {
-                    "$ifNull": ["$articulos.codigo", ""]
-                },
-                "pasillo": {
-                    "$ifNull": ["$articulos.pasillo", "—"]
-                },
-                "cantidad": {
-                    "$toInt": {
-                        "$ifNull": ["$articulos.cantidad", 0]
-                    }
-                },
-                "unitario": {
-                    "$toDouble": {
-                        "$ifNull": ["$articulos.precio", 0]
-                    }
-                },
+                "nombre": {"$ifNull": ["$articulos.nombre", ""]},
+                "codigo": {"$ifNull": ["$articulos.codigo", ""]},
+                "pasillo": {"$ifNull": ["$articulos.pasillo", "—"]},
+                "cantidad": {"$toInt": {"$ifNull": ["$articulos.cantidad", 0]}},
+                "unitario": {"$toDouble": {"$ifNull": ["$articulos.precio", 0]}}
             }
-        },
+        }
     ]

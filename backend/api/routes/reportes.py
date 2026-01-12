@@ -21,6 +21,7 @@ from decimal import Decimal
 from backend.api.dependencies import get_reportes_service
 from backend.api.schemas.reportes import ReportesFiltros
 from backend.services.reportes.service import ReportesService
+from backend.services.reportes.utils.json import limpiar_json
 
 
 router = APIRouter(tags=["Reportes"])
@@ -85,5 +86,6 @@ def generar_reportes(
     # Respuesta serializada
     # ─────────────────────────
     return JSONResponse(
-        content=_serialize_data(resultado)
+        content=limpiar_json(resultado),
+        status_code=200
     )

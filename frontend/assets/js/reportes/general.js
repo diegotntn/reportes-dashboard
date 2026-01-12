@@ -4,53 +4,57 @@
    RESPONSABILIDADES:
    - Escuchar actualización de reportes
    - Esperar a que la vista esté montada
-   - Poblar controles de la vista
-   - Dibujar la gráfica
-   - Responder a cambios de métrica
+   - Poblar selector de métricas
+   - Dibujar la gráfica general
+   - Reaccionar a cambios de métrica
 
-   NO HACE:
-   - Cargar vistas HTML
-   - Navegación de tabs
+   CONTRATO:
+   resultado.general = {
+     periodo: 'dia' | 'semana' | 'mes' | 'anio',
+     serie: [ { key, label, kpis, personas } ]
+   }
 ====================================================== */
 
 import { renderLineChart } from '/assets/js/charts.js';
 
 // ─────────────────────────────
-// Estado interno
+// Estado interno persistente
 // ─────────────────────────────
 let currentMetric = null;
 let ultimoResultado = null;
+let vistaMontada = false;
 
 // ─────────────────────────────
 // Eventos globales
 // ─────────────────────────────
 
-// Datos actualizados desde backend
+// Resultado nuevo desde backend
 window.addEventListener('reportes:actualizados', e => {
   ultimoResultado = e.detail;
   intentarRender();
 });
 
-// Cambio de tab
+// Activación de tab
 window.addEventListener('reportes:tab-activada', e => {
-  if (e.detail.tab === 'general') {
+  if (e.detail?.tab === 'general') {
+    vistaMontada = true;
     intentarRender();
   }
 });
 
 // ─────────────────────────────
-// Intento seguro de render
+// Render seguro (no se pierde)
 // ─────────────────────────────
 function intentarRender() {
   if (!ultimoResultado) return;
+  if (!vistaMontada) return;
 
   const container = document.getElementById('tab-general');
   const select = document.getElementById('metric-select');
   const canvas = document.getElementById('general-chart');
 
-  // Vista aún no montada
   if (!container || !select || !canvas) {
-    console.warn('[GeneralView] Vista no montada todavía');
+    console.warn('[GeneralView] DOM aún no disponible');
     return;
   }
 
@@ -61,20 +65,23 @@ function intentarRender() {
 // Render principal
 // ─────────────────────────────
 function renderGeneral(resultado) {
-  const general = resultado?.general;
-  const agrupacion = resultado?.agrupar || resultado?.resumen?.agrupar;
 
-  if (!general?.labels?.length || !general?.series) {
+  const general = resultado?.general;
+
+  // Validación NUEVA (contrato actual)
+  if (!general || !Array.isArray(general.serie) || general.serie.length === 0) {
     mostrarEstadoVacio();
     return;
   }
 
-  const metricas = Object.keys(general.series);
+  // Métricas disponibles desde el primer punto
+  const metricas = Object.keys(general.serie[0]?.kpis || {});
   if (!metricas.length) {
     mostrarEstadoVacio();
     return;
   }
 
+  // Métrica por defecto
   if (!currentMetric || !metricas.includes(currentMetric)) {
     currentMetric = metricas[0];
   }
@@ -82,7 +89,7 @@ function renderGeneral(resultado) {
   const select = document.getElementById('metric-select');
   const canvas = document.getElementById('general-chart');
 
-  // Poblar selector
+  // ───────── Poblar selector
   select.innerHTML = metricas.map(m => `
     <option value="${m}" ${m === currentMetric ? 'selected' : ''}>
       ${metricLabel(m)}
@@ -90,35 +97,54 @@ function renderGeneral(resultado) {
   `).join('');
 
   const draw = () => {
-    const labels = normalizeLabels(general.labels, agrupacion);
-    const values = general.series[currentMetric].map(v => Number(v) || 0);
+    // Serie filtrada por métrica (SIN perder personas)
+    const serieFiltrada = general.serie.map(p => ({
+      ...p,
+      fecha: convertirKeyAFecha(p.key, general.periodo), // 🔑 CLAVE
+      kpis: {
+        importe: Number(p.kpis[currentMetric] ?? 0)
+      }
+    }));
 
+
+    // Llamada CORREGIDA a la nueva API de charts.js
     renderLineChart(
       canvas,
-      labels,
-      [{
-        label: metricLabel(currentMetric),
-        data: values,
-        fill: true,
-        tension: 0.25,
-        borderColor: metricColor(currentMetric),
-        backgroundColor: metricBgColor(currentMetric)
-      }],
       {
+        periodo: general.periodo,
+        series: [  // ¡Ahora es 'series' (array)!
+          { 
+            label: metricLabel(currentMetric),
+            color: '#2563eb',
+            bg: 'rgba(37,99,235,.15)',
+            serie: serieFiltrada
+          }
+        ]
+      },
+      {
+        plugins: {
+          legend: { display: false }
+        },
         scales: {
-          x: buildXAxis(agrupacion),
           y: {
             beginAtZero: true,
             ticks: {
-              callback: v => v.toLocaleString('es-MX')
+              callback: v => Number(v).toLocaleString('es-MX')
+            },
+            title: {
+              display: true,
+              text: metricLabel(currentMetric)
             }
-          }
-        },
-        plugins: {
-          legend: { display: false },
-          tooltip: {
-            mode: 'index',
-            intersect: false
+          },
+          x: {
+            type: 'time',
+            time: {
+              unit: 
+                general.periodo === 'dia' ? 'day' :
+                general.periodo === 'semana' ? 'week' :
+                general.periodo === 'mes' ? 'month' :
+                'year'
+            }
           }
         }
       }
@@ -143,54 +169,11 @@ function mostrarEstadoVacio() {
   container.innerHTML = `
     <section class="card">
       <h3>Resumen general</h3>
-      <p class="text-muted">No hay datos disponibles.</p>
+      <p class="text-muted">
+        No hay datos disponibles para el rango seleccionado.
+      </p>
     </section>
   `;
-}
-
-// ─────────────────────────────
-// Normalización de labels (ISO)
-// ─────────────────────────────
-function normalizeLabels(labels, agrupacion) {
-
-  if (agrupacion === 'Mes') {
-    return labels
-      .map(l => /^\d{4}-\d{2}$/.test(l) ? `${l}-01` : l)
-      .filter(l => /^\d{4}-\d{2}-\d{2}$/.test(l));
-  }
-
-  if (agrupacion === 'Dia' || agrupacion === 'Semana') {
-    return labels;
-  }
-
-  if (agrupacion === 'Año') {
-    return labels.map(y => `${y}-01-01`);
-  }
-
-  return labels;
-}
-
-// ─────────────────────────────
-// Configuración eje X
-// ─────────────────────────────
-function buildXAxis(agrupacion) {
-
-  const base = {
-    type: 'time',
-    ticks: { source: 'data' }
-  };
-
-  if (agrupacion === 'Mes') {
-    base.time = { unit: 'month', displayFormats: { month: 'MMM yyyy' } };
-  } else if (agrupacion === 'Semana') {
-    base.time = { unit: 'week', displayFormats: { week: "'Sem' w" } };
-  } else if (agrupacion === 'Dia') {
-    base.time = { unit: 'day', displayFormats: { day: 'dd MMM' } };
-  } else {
-    base.time = { unit: 'year', displayFormats: { year: 'yyyy' } };
-  }
-
-  return base;
 }
 
 // ─────────────────────────────
@@ -199,17 +182,38 @@ function buildXAxis(agrupacion) {
 function metricLabel(m) {
   if (m === 'importe') return 'Importe';
   if (m === 'devoluciones') return 'Devoluciones';
-  return 'Piezas';
+  if (m === 'piezas') return 'Piezas';
+  return m;
 }
 
-function metricColor(m) {
-  if (m === 'importe') return '#2563eb';
-  if (m === 'devoluciones') return '#dc2626';
-  return '#16a34a';
+function convertirKeyAFecha(key, periodo) {
+  if (!key) return null;
+
+  // dia: YYYY-MM-DD
+  if (periodo === 'dia') {
+    const [y, m, d] = key.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+
+  // mes: YYYY-MM
+  if (periodo === 'mes') {
+    const [y, m] = key.split('-').map(Number);
+    return new Date(y, m - 1, 1);
+  }
+
+  // semana: YYYY-Www
+  if (periodo === 'semana') {
+    const [y, w] = key.split('-W').map(Number);
+    return isoWeekToDate(y, w);
+  }
+
+  return null;
 }
 
-function metricBgColor(m) {
-  if (m === 'importe') return 'rgba(37,99,235,.15)';
-  if (m === 'devoluciones') return 'rgba(220,38,38,.15)';
-  return 'rgba(22,163,74,.15)';
+// helper ISO (idéntico al que ya usas)
+function isoWeekToDate(y, w) {
+  const s = new Date(Date.UTC(y, 0, 1 + (w - 1) * 7));
+  const d = s.getUTCDay();
+  s.setUTCDate(s.getUTCDate() - (d <= 4 ? d - 1 : d - 8));
+  return new Date(s);
 }

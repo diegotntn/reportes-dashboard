@@ -1,10 +1,5 @@
 /* ======================================================
    PasillosView Controller
-   ======================================================
-   - Eje X = rango del filtro (SIEMPRE)
-   - Granularidad del eje = agrupar (Día | Semana | Mes)
-   - Días/semanas/meses sin datos = 0
-   - Logs SOLO para depurar fechas / claves
 ====================================================== */
 
 import { renderLineChart } from '../charts.js';
@@ -83,7 +78,7 @@ function renderPasillos(resultado, controls, container) {
   }
 
   const kpisDisponibles = ['importe', 'piezas', 'devoluciones']
-    .filter(k => dataPorPasillo[pasilloActual].series.some(pt => pt[k] != null));
+    .filter(k => dataPorPasillo[pasilloActual].series.some(pt => Number.isFinite(pt[k])));
 
   if (!kpisDisponibles.includes(kpiActual)) {
     kpiActual = kpisDisponibles[0];
@@ -106,56 +101,47 @@ function renderPasillos(resultado, controls, container) {
 ====================================================== */
 function renderActual(container) {
   container.innerHTML = '';
-
   if (modoActual === 'Individual') renderIndividual(container);
   else if (modoActual === 'Comparación') renderComparacion(container);
   else renderTodos(container);
 }
 
 /* ======================================================
-   CALENDARIO MAESTRO (DESDE FILTRO + AGRUPACIÓN)
+   AGRUPAR NORMALIZADO
 ====================================================== */
 function getAgrupar() {
-  // soporta "Dia" / "Día" / "día"
-  const a = (ultimoResultado?.rango?.agrupar ?? 'Día');
-  const norm = String(a).trim().toLowerCase();
-  if (norm === 'mes') return 'Mes';
-  if (norm === 'semana') return 'Semana';
-  return 'Día';
+  const raw = String(ultimoResultado?.rango?.agrupar ?? 'Dia').toLowerCase();
+  if (raw.startsWith('mes')) return 'Mes';
+  if (raw.startsWith('sem')) return 'Semana';
+  return 'Dia';
 }
 
+/* ======================================================
+   CALENDARIO MAESTRO
+====================================================== */
 function calendarioDesdeFiltro() {
   const inicio = ultimoResultado?.rango?.inicio;
   const fin = ultimoResultado?.rango?.fin;
   const agrupar = getAgrupar();
 
-  console.log('[PASILLOS] Rango filtro:', inicio, '→', fin, 'Agrupar:', agrupar);
-
   if (!inicio || !fin) return { labelsKey: [], labelsDate: [], unit: 'day', agrupar };
 
   if (agrupar === 'Mes') {
-    const labelsKey = rangoMensualKey(inicio, fin);         // ['2025-01','2025-02',...]
-    const labelsDate = labelsKey.map(k => keyMesToDate(k)); // Date(YYYY,MM,1)
-    console.log('[PASILLOS] Labels (Mes):', labelsKey.length, labelsKey.slice(0, 6), '...');
-    return { labelsKey, labelsDate, unit: 'month', agrupar };
+    const labelsKey = rangoMensualKey(inicio, fin);
+    return { labelsKey, labelsDate: labelsKey.map(keyMesToDate), unit: 'month', agrupar };
   }
 
   if (agrupar === 'Semana') {
-    const labelsKey = rangoSemanalKey(inicio, fin);             // ['2025-W01','2025-W02',...]
-    const labelsDate = labelsKey.map(k => keySemanaToDate(k));  // Date = lunes de esa semana ISO
-    console.log('[PASILLOS] Labels (Semana):', labelsKey.length, labelsKey.slice(0, 6), '...');
-    return { labelsKey, labelsDate, unit: 'week', agrupar };
+    const labelsKey = rangoSemanalKey(inicio, fin);
+    return { labelsKey, labelsDate: labelsKey.map(keySemanaToDate), unit: 'week', agrupar };
   }
 
-  // Día
-  const labelsKey = rangoDiarioKey(inicio, fin);            // ['2025-01-01',...]
-  const labelsDate = labelsKey.map(k => keyDiaToDate(k));   // Date(YYYY,MM,DD)
-  console.log('[PASILLOS] Labels (Día):', labelsKey.length, labelsKey.slice(0, 6), '...');
-  return { labelsKey, labelsDate, unit: 'day', agrupar };
+  const labelsKey = rangoDiarioKey(inicio, fin);
+  return { labelsKey, labelsDate: labelsKey.map(keyDiaToDate), unit: 'day', agrupar };
 }
 
 /* ======================================================
-   GRÁFICAS
+   GRÁFICAS - CORREGIDO
 ====================================================== */
 function renderIndividual(container) {
   const bloque = dataPorPasillo[pasilloActual];
@@ -165,49 +151,85 @@ function renderIndividual(container) {
   if (!labelsKey.length) return;
 
   const data = normalizarSerieContra(labelsKey, bloque.series, kpiActual, agrupar);
-
-  console.log(`[PASILLOS] ${pasilloActual} keys(data) sample:`, labelsKey.slice(0, 6));
-  console.log(`[PASILLOS] ${pasilloActual} data sample:`, data.slice(0, 12));
+  
+  // Crear serie en formato compatible con charts.js
+  const serie = labelsKey.map((key, i) => ({
+    key: key,
+    label: formatearLabel(key, agrupar),
+    fecha: labelsDate[i],
+    kpis: {
+      importe: data[i] || 0,
+      piezas: 0,
+      devoluciones: 0
+    }
+  }));
 
   const canvas = crearCanvas(container);
 
-  renderLineChart(
-    canvas,
-    labelsDate,
-    [{
+  // Llamar CORRECTAMENTE a renderLineChart (API NUEVA)
+  renderLineChart(canvas, {
+    periodo: agrupar.toLowerCase(),
+    series: [{  // ¡IMPORTANTE: 'series' (plural) y es un array!
       label: pasilloActual,
-      data,
-      borderColor: COLORES[0],
-      backgroundColor: COLORES_BG[0],
-      spanGaps: true
-    }],
-    opcionesTime(kpiActual, `Tendencia · ${pasilloActual}`, unit)
-  );
+      color: COLORES[0],
+      bg: COLORES_BG[0],
+      serie: serie  // ¡Y aquí dentro es 'serie' (singular)!
+    }]
+  }, opcionesTime(kpiActual, `Tendencia · ${pasilloActual}`, unit));
 }
-
 function renderComparacion(container) {
   const { labelsKey, labelsDate, unit, agrupar } = calendarioDesdeFiltro();
   if (!labelsKey.length) return;
 
-  const canvas = crearCanvas(container);
+  console.log('[PASILLOS][Comparación] labels:', labelsKey.length);
 
-  const datasets = PASILLOS_VALIDOS
+  const series = PASILLOS_VALIDOS
     .filter(p => dataPorPasillo[p])
     .map((p, i) => {
-      const data = normalizarSerieContra(labelsKey, dataPorPasillo[p].series, kpiActual, agrupar);
+      const bloque = dataPorPasillo[p];
+
+      const data = normalizarSerieContra(
+        labelsKey,
+        bloque.series,
+        kpiActual,
+        agrupar
+      );
+
+      console.log(`[PASILLOS][Comparación] ${p} data:`, data.slice(0, 6));
+
+      const serie = labelsKey.map((key, idx) => ({
+        key,
+        label: formatearLabel(key, agrupar),
+        fecha: labelsDate[idx],
+        kpis: {
+          importe: data[idx] || 0,
+          piezas: 0,
+          devoluciones: 0
+        }
+      }));
+
       return {
         label: p,
-        data,
-        borderColor: COLORES[i],
-        backgroundColor: COLORES_BG[i],
-        spanGaps: true
+        color: COLORES[i],
+        bg: COLORES_BG[i],
+        fill: false,
+        serie
       };
     });
 
+  if (!series.length) {
+    console.warn('[PASILLOS][Comparación] sin series');
+    return;
+  }
+
+  const canvas = crearCanvas(container);
+
   renderLineChart(
     canvas,
-    labelsDate,
-    datasets,
+    {
+      periodo: agrupar.toLowerCase(),
+      series
+    },
     opcionesTime(kpiActual, `Comparación · ${kpiActual}`, unit)
   );
 }
@@ -223,10 +245,25 @@ function renderTodos(container) {
     const bloque = dataPorPasillo[p];
     if (!bloque) return;
 
-    const data = normalizarSerieContra(labelsKey, bloque.series, kpiActual, agrupar);
+    const data = normalizarSerieContra(
+      labelsKey,
+      bloque.series,
+      kpiActual,
+      agrupar
+    );
 
-    const localMax = Math.max(...data);
-    const suggestedMax = localMax > 0 ? localMax * 1.15 : 1;
+    console.log(`[PASILLOS][Todos] ${p} data:`, data.slice(0, 6));
+
+    const serie = labelsKey.map((key, idx) => ({
+      key,
+      label: formatearLabel(key, agrupar),
+      fecha: labelsDate[idx],
+      kpis: {
+        importe: data[idx] || 0,
+        piezas: 0,
+        devoluciones: 0
+      }
+    }));
 
     const card = document.createElement('section');
     card.className = 'card';
@@ -234,35 +271,29 @@ function renderTodos(container) {
     const h = document.createElement('h4');
     h.textContent = p;
 
-    const wrapper = document.createElement('div');
-    wrapper.style.height = '340px';
-    wrapper.style.position = 'relative';
-
     const canvas = document.createElement('canvas');
-    canvas.style.position = 'absolute';
-    canvas.style.inset = '0';
+    canvas.style.width = '100%';
+    canvas.style.height = '280px';
 
-    wrapper.appendChild(canvas);
-    card.append(h, wrapper);
+    card.append(h, canvas);
     grid.appendChild(card);
 
     renderLineChart(
       canvas,
-      labelsDate,
-      [{
-        label: p,
-        data,
-        borderColor: COLORES[i],
-        backgroundColor: COLORES_BG[i],
-        fill: false,
-        tension: 0.25,
-        spanGaps: true
-      }],
+      {
+        periodo: agrupar.toLowerCase(),
+        series: [{
+          label: p,
+          color: COLORES[i],
+          bg: COLORES_BG[i],
+          fill: false,
+          serie
+        }]
+      },
       {
         ...opcionesTime(kpiActual, `Tendencia · ${p}`, unit),
-        scales: {
-          x: { type: 'time', time: { unit } },
-          y: { beginAtZero: true, suggestedMax }
+        plugins: {
+          legend: { display: false }
         }
       }
     );
@@ -271,250 +302,231 @@ function renderTodos(container) {
   container.appendChild(grid);
 }
 
+
 /* ======================================================
-   NORMALIZACIÓN (ALINEA DATOS A LA GRANULARIDAD)
-   - labelsKey: claves del eje (día/semana/mes)
-   - retorna data[] alineada (faltantes -> 0)
+   FUNCIÓN PARA FORMATEAR LABELS
+====================================================== */
+function formatearLabel(key, agrupar) {
+  if (agrupar === 'Dia') {
+    const [y, m, d] = key.split('-');
+    return `${d}/${m}/${y}`;
+  }
+  if (agrupar === 'Mes') {
+    const [y, m] = key.split('-');
+    return `${m}/${y}`;
+  }
+  if (agrupar === 'Semana') {
+    const [y, w] = key.split('-W');
+    return `Sem ${w} ${y}`;
+  }
+  return key;
+}
+
+/* ======================================================
+   OPCIONES TIME COMPLETA
+====================================================== */
+function opcionesTime(kpi, titulo, unit) {
+  return {
+    aspectRatio: 2.5,
+    plugins: {
+      title: {
+        display: true,
+        text: titulo,
+        font: {
+          size: 16,
+          weight: 'bold'
+        }
+      }
+    },
+    scales: {
+      x: {
+        type: 'time',
+        time: {
+          unit: unit,
+          displayFormats: {
+            day: 'dd/MM',
+            week: "'Sem' w",
+            month: 'MMM yyyy'
+          }
+        },
+        title: {
+          display: true,
+          text: 'Fecha'
+        }
+      },
+      y: {
+        beginAtZero: true,
+        title: {
+          display: true,
+          text: kpi.toUpperCase()
+        }
+      }
+    }
+  };
+}
+
+/* ======================================================
+   NORMALIZACIÓN DE SERIES (MANTENER IGUAL)
 ====================================================== */
 function normalizarSerieContra(labelsKey, series, kpi, agrupar) {
   const map = new Map();
 
   for (const p of series || []) {
-    const key = normalizarClaveSegunAgrupar(p.fecha ?? p.date ?? p.Fecha, agrupar);
+    const key = normalizarClaveSegunAgrupar(p.fecha, agrupar);
     if (!key) continue;
 
-    const prev = map.get(key) ?? 0;
-    const val = Number(p[kpi] ?? 0) || 0;
-    map.set(key, prev + val);
+    const val = Number(p[kpi]);
+    map.set(key, (map.get(key) ?? 0) + (Number.isFinite(val) ? val : 0));
   }
 
   return labelsKey.map(k => map.get(k) ?? 0);
 }
 
 function normalizarClaveSegunAgrupar(x, agrupar) {
+  const iso = extraerFechaISO(x);
+  if (!iso) return null;
+
+  if (agrupar === 'Dia') return iso;
+  if (agrupar === 'Mes') return iso.slice(0, 7);
+
+  const d = keyDiaToDate(iso);
+  return `${isoWeekYear(d)}-W${String(isoWeekNumber(d)).padStart(2, '0')}`;
+}
+
+function extraerFechaISO(x) {
   if (!x) return null;
-
-  // si ya viene como clave "YYYY-MM-DD"
-  if (agrupar === 'Día') {
-    if (typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x)) return x;
-    const d = new Date(x);
-    return isNaN(d) ? null : fmtDia(d);
-  }
-
-  // Mes: clave "YYYY-MM"
-  if (agrupar === 'Mes') {
-    if (typeof x === 'string' && /^\d{4}-\d{2}$/.test(x)) return x;
-    const d = new Date(x);
-    return isNaN(d) ? null : fmtMes(d);
-  }
-
-  // Semana: clave "YYYY-Www"
-  if (typeof x === 'string' && /^\d{4}-W\d{2}$/.test(x)) return x;
+  if (typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x)) return x;
   const d = new Date(x);
-  if (isNaN(d)) return null;
-  const y = isoWeekYear(d);
-  const w = isoWeekNumber(d);
-  return `${y}-W${String(w).padStart(2, '0')}`;
+  return isNaN(d) ? null : fmtDia(d);
 }
 
 /* ======================================================
-   RANGOS DE CLAVES (Día / Semana / Mes)
+   RANGOS Y HELPERS FECHA (MANTENER IGUAL)
 ====================================================== */
-function rangoDiarioKey(inicioISO, finISO) {
-  const [yi, mi, di] = inicioISO.split('-').map(Number);
-  const [yf, mf, df] = finISO.split('-').map(Number);
-
-  let d = new Date(yi, mi - 1, di);
-  const end = new Date(yf, mf - 1, df);
-
-  d.setHours(0, 0, 0, 0);
-  end.setHours(0, 0, 0, 0);
-
-  const res = [];
-  while (d <= end) {
-    res.push(fmtDia(d));
-    d.setDate(d.getDate() + 1);
-  }
+function rangoDiarioKey(i, f) {
+  let d = keyDiaToDate(i), end = keyDiaToDate(f), res = [];
+  while (d <= end) { res.push(fmtDia(d)); d.setDate(d.getDate() + 1); }
   return res;
 }
 
-function rangoMensualKey(inicioISO, finISO) {
-  const [yi, mi] = inicioISO.split('-').map(Number);
-  const [yf, mf] = finISO.split('-').map(Number);
-
-  let y = yi;
-  let m = mi;
-
-  const res = [];
+function rangoMensualKey(i, f) {
+  const [yi, mi] = i.split('-').map(Number);
+  const [yf, mf] = f.split('-').map(Number);
+  let y = yi, m = mi, res = [];
   while (y < yf || (y === yf && m <= mf)) {
     res.push(`${y}-${String(m).padStart(2, '0')}`);
-    m++;
-    if (m > 12) { m = 1; y++; }
+    if (++m > 12) { m = 1; y++; }
   }
   return res;
 }
 
-function rangoSemanalKey(inicioISO, finISO) {
-  let d = keyDiaToDate(inicioISO);     // Date local a medianoche
-  const end = keyDiaToDate(finISO);
-
-  // mover al lunes ISO
-  d = startOfISOMonday(d);
-
-  const res = [];
+function rangoSemanalKey(i, f) {
+  let d = startOfISOMonday(keyDiaToDate(i)), end = keyDiaToDate(f), res = [];
   while (d <= end) {
-    const y = isoWeekYear(d);
-    const w = isoWeekNumber(d);
-    res.push(`${y}-W${String(w).padStart(2, '0')}`);
+    res.push(`${isoWeekYear(d)}-W${String(isoWeekNumber(d)).padStart(2, '0')}`);
     d.setDate(d.getDate() + 7);
   }
   return res;
 }
 
-/* ======================================================
-   CLAVE -> DATE (para Chart.js time scale)
-====================================================== */
-function keyDiaToDate(keyDia) {
-  const [y, m, d] = keyDia.split('-').map(Number);
-  return new Date(y, m - 1, d);
+function keyDiaToDate(k) { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); }
+function keyMesToDate(k) { const [y, m] = k.split('-').map(Number); return new Date(y, m - 1, 1); }
+function keySemanaToDate(k) { const [y, w] = k.split('-W').map(Number); return isoWeekToDate(y, w); }
+
+function startOfISOMonday(d) {
+  const r = new Date(d); r.setDate(r.getDate() - ((r.getDay() + 6) % 7)); return r;
 }
 
-function keyMesToDate(keyMes) {
-  const [y, m] = keyMes.split('-').map(Number);
-  return new Date(y, m - 1, 1);
+function isoWeekYear(d) {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+  return t.getUTCFullYear();
 }
 
-function keySemanaToDate(keySemana) {
-  // key: "YYYY-Www" -> lunes de esa semana
-  const [yPart, wPart] = keySemana.split('-W');
-  const y = Number(yPart);
-  const w = Number(wPart);
-  return isoWeekToDate(y, w);
+function isoWeekNumber(d) {
+  const t = new Date(Date.UTC(d.getFullYear(), d.getMonth(), d.getDate()));
+  t.setUTCDate(t.getUTCDate() + 4 - (t.getUTCDay() || 7));
+  return Math.ceil((((t - new Date(Date.UTC(t.getUTCFullYear(), 0, 1))) / 86400000) + 1) / 7);
 }
 
-/* ======================================================
-   ISO WEEK HELPERS
-====================================================== */
-function startOfISOMonday(date) {
-  const d = new Date(date.getFullYear(), date.getMonth(), date.getDate());
-  d.setHours(0, 0, 0, 0);
-  const day = (d.getDay() + 6) % 7; // lunes=0 ... domingo=6
-  d.setDate(d.getDate() - day);
-  return d;
+function isoWeekToDate(y, w) {
+  const s = new Date(Date.UTC(y, 0, 1 + (w - 1) * 7));
+  const d = s.getUTCDay();
+  s.setUTCDate(s.getUTCDate() - (d <= 4 ? d - 1 : d - 8));
+  return new Date(s);
 }
 
-// ISO week-year (puede diferir en primeros/últimos días del año)
-function isoWeekYear(date) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-  return d.getUTCFullYear();
-}
-
-function isoWeekNumber(date) {
-  const d = new Date(Date.UTC(date.getFullYear(), date.getMonth(), date.getDate()));
-  d.setUTCDate(d.getUTCDate() + 4 - (d.getUTCDay() || 7));
-  const yearStart = new Date(Date.UTC(d.getUTCFullYear(), 0, 1));
-  const weekNo = Math.ceil((((d - yearStart) / 86400000) + 1) / 7);
-  return weekNo;
-}
-
-function isoWeekToDate(isoYear, isoWeek) {
-  // lunes de la semana isoWeek del isoYear
-  const simple = new Date(Date.UTC(isoYear, 0, 1 + (isoWeek - 1) * 7));
-  const dow = simple.getUTCDay();
-  const isoMonday = simple;
-  if (dow <= 4) isoMonday.setUTCDate(simple.getUTCDate() - (dow === 0 ? 6 : dow - 1));
-  else isoMonday.setUTCDate(simple.getUTCDate() + (8 - dow));
-  return new Date(isoMonday.getUTCFullYear(), isoMonday.getUTCMonth(), isoMonday.getUTCDate());
-}
+function fmtDia(d) { return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; }
 
 /* ======================================================
-   FORMATEADORES (sin zona horaria rara)
-====================================================== */
-function fmtDia(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  const da = String(d.getDate()).padStart(2, '0');
-  return `${y}-${m}-${da}`;
-}
-
-function fmtMes(d) {
-  const y = d.getFullYear();
-  const m = String(d.getMonth() + 1).padStart(2, '0');
-  return `${y}-${m}`;
-}
-
-/* ======================================================
-   UI HELPERS
+   UI
 ====================================================== */
 function crearCanvas(container) {
-  const c = document.createElement('canvas');
-  c.height = 300;
-  container.appendChild(c);
-  return c;
-}
-
-function opcionesTime(kpi, titulo, unit = 'day') {
-  return {
-    plugins: { title: { display: true, text: titulo } },
-    scales: {
-      x: { type: 'time', time: { unit } },
-      y: { title: { display: true, text: kpi } }
-    }
-  };
+  const canvas = document.createElement('canvas');
+  canvas.style.width = '100%';
+  canvas.style.height = '400px';
+  canvas.style.maxHeight = '500px';
+  container.appendChild(canvas);
+  return canvas;
 }
 
 function mostrarEstadoEspera() {
-  const c = document.getElementById('pasillos-container');
-  if (c) c.innerHTML = estadoVacio('Esperando datos…');
+  const container = document.getElementById('pasillos-container');
+  if (container) container.innerHTML = estadoVacio('Esperando datos…');
 }
 
-function estadoVacio(txt = 'No hay datos por pasillo.') {
-  return `
-    <section class="card empty-state">
-      <h4>Reporte por pasillos</h4>
-      <p class="text-muted">${txt}</p>
-    </section>`;
+function estadoVacio(t = 'No hay datos por pasillo.') {
+  return `<section class="card empty-state"><h4>Reporte por pasillos</h4><p>${t}</p></section>`;
 }
 
 /* ======================================================
    DATOS
 ====================================================== */
-function extraerDatosPasillos(resultado) {
-  const datos = {};
-  Object.entries(resultado?.por_pasillo || {}).forEach(([k, v]) => {
+function extraerDatosPasillos(res) {
+  const o = {};
+  Object.entries(res?.por_pasillo || {}).forEach(([k, v]) => {
     const p = normalizarPasillo(k);
-    if (p && Array.isArray(v?.series)) datos[p] = { series: v.series };
+    if (p && Array.isArray(v?.series)) {
+      o[p] = { 
+        series: v.series.map(item => ({
+          ...item,
+          fecha: item.fecha || item.key || ''
+        }))
+      };
+    }
   });
-  return datos;
+  return o;
 }
 
 function normalizarPasillo(p) {
-  const v = String(p).trim().toUpperCase();
+  const v = String(p).toUpperCase();
   if (PASILLOS_VALIDOS.includes(v)) return v;
   if (/^[1-4]$/.test(v)) return `P${v}`;
   return null;
 }
 
 /* ======================================================
-   CONTROLES UI
+   CONTROLES
 ====================================================== */
-function label(t) {
-  const l = document.createElement('label');
-  l.textContent = t;
+function label(t) { 
+  const l = document.createElement('label'); 
+  l.textContent = t; 
   l.style.margin = '0 6px';
-  return l;
+  l.style.fontWeight = '500';
+  l.style.color = '#374151';
+  return l; 
 }
 
-function select(vals, cur, cb) {
-  const s = document.createElement('select');
-  vals.forEach(v => {
-    const o = document.createElement('option');
-    o.value = v;
-    o.textContent = v;
-    s.appendChild(o);
-  });
-  s.value = cur;
-  s.onchange = () => cb(s.value);
-  return s;
+function select(vs, c, cb) { 
+  const s = document.createElement('select'); 
+  s.style.margin = '0 12px 0 4px';
+  s.style.padding = '6px 12px';
+  s.style.border = '1px solid #d1d5db';
+  s.style.borderRadius = '4px';
+  s.style.backgroundColor = 'white';
+  
+  vs.forEach(v => s.append(new Option(v, v))); 
+  s.value = c; 
+  s.onchange = () => cb(s.value); 
+  return s; 
 }
