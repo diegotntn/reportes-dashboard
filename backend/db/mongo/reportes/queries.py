@@ -13,31 +13,27 @@ class ReportesQueries:
 
     RESPONSABILIDAD:
     - Construir pipelines Mongo
-    - Delegar ejecución al repositorio
-    - Normalizar resultados para servicios
+    - Ejecutar aggregate sobre la colección
+    - Devolver datos en la forma que el servicio necesita
 
     NO HACE:
-    - Acceso directo a Mongo
     - Lógica de negocio
+    - Transformaciones analíticas
     """
 
-    def __init__(self, devoluciones_repo):
+    def __init__(self, collection):
         """
-        devoluciones_repo: DevolucionesRepo
+        collection: pymongo.collection.Collection
         """
-        self.repo = devoluciones_repo
-        print("DEBUG repo:", type(self.repo))
+        self.collection = collection
+        print("DEBUG collection:", type(self.collection))
 
     # ─────────────────────────────
-    # DEVOLUCIONES (BASE DE REPORTES)
+    # DEVOLUCIONES (BASE ANALÍTICA)
     # ─────────────────────────────
     def devoluciones_detalle(self, filtros: dict) -> pd.DataFrame:
-        """
-        Detalle por artículo.
-        Base para KPIs y agrupaciones.
-        """
         pipeline = pipeline_devoluciones_detalle(filtros)
-        data = self.repo.aggregate(pipeline)
+        data = list(self.collection.aggregate(pipeline))
 
         if not data:
             return pd.DataFrame(
@@ -55,12 +51,8 @@ class ReportesQueries:
 
     # ─────────────────────────────
     def devoluciones_resumen(self, filtros: dict) -> pd.DataFrame:
-        """
-        Resumen general de devoluciones
-        (Historial – tabla principal).
-        """
         pipeline = pipeline_devoluciones_resumen(filtros)
-        data = self.repo.aggregate(pipeline)
+        data = list(self.collection.aggregate(pipeline))
 
         if not data:
             return pd.DataFrame(
@@ -79,12 +71,8 @@ class ReportesQueries:
 
     # ─────────────────────────────
     def devolucion_articulos(self, devolucion_id: str) -> pd.DataFrame:
-        """
-        Artículos de una devolución específica
-        (Historial – panel de detalle).
-        """
         pipeline = pipeline_devolucion_articulos(devolucion_id)
-        data = self.repo.aggregate(pipeline)
+        data = list(self.collection.aggregate(pipeline))
 
         if not data:
             return pd.DataFrame(
@@ -100,3 +88,33 @@ class ReportesQueries:
         return pd.DataFrame(data)
 
     # ─────────────────────────────
+    # ASIGNACIONES DE PERSONAL
+    # ─────────────────────────────
+    def asignaciones_activas(self, **_filtros):
+        """
+        Devuelve asignaciones activas de personal.
+
+        COMPATIBLE CON:
+        - services/reportes/personas/agrupacion.py
+
+        DEVUELVE:
+        - List[dict] con:
+          { "pasillo": str, "persona": str }
+        """
+
+        pipeline = [
+            {"$match": {"activo": True}},
+            {
+                "$project": {
+                    "_id": 0,
+                    "pasillo": 1,
+                    "persona": 1,
+                }
+            },
+        ]
+
+        data = list(self.collection.aggregate(pipeline))
+
+        # 🔑 IMPORTANTE:
+        # Devuelve LISTA DE DICTS, no DataFrame
+        return data or []

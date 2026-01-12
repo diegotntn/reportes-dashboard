@@ -1,19 +1,17 @@
 from dataclasses import dataclass
 
 
-@dataclass
+@dataclass(frozen=True)
 class Vendedor:
+    """
+    Vendedor (dimensión de análisis).
+
+    MODELO DE LECTURA:
+    - Describe a un vendedor en un momento histórico
+    - No valida
+    - No muta
+    - No contiene reglas de negocio
+    """
     id: str
     nombre: str
-    activo: bool = True
-
-    def validar_nombre(self):
-        if not self.nombre or not self.nombre.strip():
-            raise ValueError("Nombre del vendedor obligatorio.")
-
-    def validar_activo(self):
-        if not self.activo:
-            raise ValueError("Vendedor inactivo.")
-
-    def desactivar(self):
-        self.activo = False
+    activo: bool

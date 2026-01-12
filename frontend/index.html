@@ -2,12 +2,12 @@
 <html lang="es">
 <head>
   <meta charset="UTF-8" />
-  <title>ReporteSurtido · Dashboard</title>
+  <title>ReporteSurtido · Reportes</title>
 
   <!-- SEO básico -->
   <meta
     name="description"
-    content="Dashboard de reportes de surtido, devoluciones, productos y personal."
+    content="Dashboard de reportes de surtido y devoluciones."
   />
 
   <!-- Responsive -->
@@ -32,37 +32,56 @@
     <div class="app-header__content">
       <h1 class="app-title">Reporte de Surtido</h1>
       <p class="app-subtitle">
-        Control y análisis de productos, personal y devoluciones
+        Análisis y visualización de datos operativos
       </p>
     </div>
   </header>
 
-  <!-- ───────── Navegación principal ───────── -->
+  <!-- ───────── Navegación (solo visual) ───────── -->
   <nav class="app-nav" role="navigation">
-    <button class="nav-button" data-route="reportes">Reportes</button>
-    <button class="nav-button" data-route="productos">Productos</button>
-    <button class="nav-button" data-route="personal">Personal</button>
-    <button class="nav-button" data-route="devoluciones">Devoluciones</button>
+    <button class="nav-button nav-button--active" disabled>
+      Reportes
+    </button>
   </nav>
 
-  <!-- ───────── Contenedor SPA ───────── -->
+  <!-- ───────── Contenedor principal ───────── -->
   <main id="main-content" class="app-main" role="main">
-    <!-- El router inyecta aquí las vistas -->
+
+    <!-- ═══════════════════════════════
+         CONTENEDORES DE TABS (OBLIGATORIOS)
+         El router SOLO inyecta HTML aquí
+    ═══════════════════════════════ -->
+
+    <section id="tab-general"  class="tab-panel"></section>
+    <section id="tab-pasillos" class="tab-panel"></section>
+    <section id="tab-personas" class="tab-panel"></section>
+    <section id="tab-zonas"    class="tab-panel"></section>
+    <section id="tab-detalle"  class="tab-panel"></section>
+
   </main>
 
   <!-- ───────── Footer ───────── -->
   <footer class="app-footer">
-    <small>© 2026 · ReporteSurtido</small>
+    <small>© 2026 · ReporteSurtido · Módulo de Reportes</small>
   </footer>
 
-  <!-- ───────── Librerías externas (GLOBAL) ───────── -->
-  <!-- Chart.js UMD LOCAL: expone `Chart` global -->
-  <script src="/assets/lib/chartjs/chart.umd.min.js"></script>
+  <!-- ───────── Librerías externas ───────── -->
 
-  <!-- ───────── Arranque de la SPA (ES Modules) ───────── -->
+  <!-- Chart.js (vista General) -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+
+  <!-- Adapter fechas -->
+  <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns@3"></script>
+
+  <!-- Plotly (vista Pasillos) -->
+  <script src="https://cdn.plot.ly/plotly-2.27.0.min.js"></script>
+
+  <!-- ───────── Arranque real de la app ───────── -->
   <script type="module">
-    import { iniciarRouter } from './assets/js/router.js';
-    iniciarRouter();
+    import { renderReportesScreen } from './assets/js/reportes/index.js';
+
+    const main = document.getElementById('main-content');
+    renderReportesScreen(main);
   </script>
 
 </body>

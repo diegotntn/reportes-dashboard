@@ -1,10 +1,16 @@
 # domain/devoluciones.py
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from typing import List, Optional
 
 
-@dataclass
+@dataclass(frozen=True)
 class Articulo:
+    """
+    Artículo devuelto (modelo de lectura).
+
+    Representa un dato histórico.
+    NO valida, NO calcula estado, NO muta.
+    """
     nombre: str
     codigo: str
     pasillo: str
@@ -13,44 +19,71 @@ class Articulo:
 
     @property
     def total(self) -> float:
+        """
+        Total del artículo (cálculo derivado, sin efectos secundarios).
+        """
         return round(self.cantidad * self.unitario, 2)
 
     @classmethod
     def from_dict(cls, data: dict) -> "Articulo":
+        """
+        Crea un Articulo desde un dict (lectura).
+        """
         return cls(
-            nombre=data["nombre"],
-            codigo=data["codigo"],
-            pasillo=data["pasillo"],
-            cantidad=int(data["cantidad"]),
-            unitario=float(data["unitario"]),
+            nombre=data.get("nombre", ""),
+            codigo=data.get("codigo", ""),
+            pasillo=data.get("pasillo", ""),
+            cantidad=int(data.get("cantidad", 0)),
+            unitario=float(data.get("unitario", 0.0)),
         )
 
 
-@dataclass
+@dataclass(frozen=True)
 class Devolucion:
+    """
+    Devolución (evento histórico).
+
+    MODELO DE LECTURA:
+    - Describe lo que ocurrió
+    - No valida
+    - No cambia estatus
+    - No impone reglas de negocio
+    """
     id: str
     folio: str
     cliente: str
     direccion: str
     motivo: str
     zona: str
-    articulos: List[Articulo] = field(default_factory=list)
-    vendedor_id: Optional[str] = None
-    estatus: str = "pendiente"
+    articulos: List[Articulo]
+    vendedor_id: Optional[str]
+    estatus: str
 
+    @property
     def total(self) -> float:
+        """
+        Total de la devolución (derivado).
+        """
         return round(sum(a.total for a in self.articulos), 2)
 
-    def validar(self):
-        if not self.folio:
-            raise ValueError("La devolución debe tener folio.")
-        if not self.articulos:
-            raise ValueError("Debe contener al menos un artículo.")
-        if self.total() <= 0:
-            raise ValueError("El total debe ser mayor a cero.")
+    @classmethod
+    def from_dict(cls, data: dict) -> "Devolucion":
+        """
+        Construye una Devolución desde un dict Mongo.
+        """
+        articulos = [
+            Articulo.from_dict(a)
+            for a in data.get("articulos", [])
+        ]
 
-    def cambiar_estatus(self, nuevo: str):
-        permitidos = {"pendiente", "aprobada", "rechazada"}
-        if nuevo not in permitidos:
-            raise ValueError(f"Estatus inválido: {nuevo}")
-        self.estatus = nuevo
+        return cls(
+            id=str(data.get("_id")),
+            folio=data.get("folio", ""),
+            cliente=data.get("cliente", ""),
+            direccion=data.get("direccion", ""),
+            motivo=data.get("motivo", ""),
+            zona=data.get("zona", ""),
+            articulos=articulos,
+            vendedor_id=data.get("vendedor_id"),
+            estatus=data.get("estatus", ""),
+        )

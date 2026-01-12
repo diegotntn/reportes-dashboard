@@ -4,19 +4,17 @@ Rutas API para reportes.
 RESPONSABILIDAD:
 - Recibir parámetros HTTP
 - Validar entrada mínima
-- Delegar a ReportesService._generar()
+- Delegar a ReportesService.generar()
 - Devolver JSON serializado
 
 NO CONTIENE:
 - Lógica de negocio
 - Acceso a Mongo
-- pandas
+- Pandas / numpy como dependencia lógica
 """
 
 from fastapi import APIRouter, Depends, HTTPException
 from fastapi.responses import JSONResponse
-import pandas as pd
-import numpy as np
 from datetime import datetime, date
 from decimal import Decimal
 
@@ -32,31 +30,17 @@ router = APIRouter(tags=["Reportes"])
 # SERIALIZADOR SEGURO
 # ─────────────────────────────
 def _serialize_data(data):
-    if isinstance(data, pd.DataFrame):
-        if data.empty:
-            return []
-        return data.replace({np.nan: None}).to_dict(orient="records")
+    if isinstance(data, dict):
+        return {k: _serialize_data(v) for k, v in data.items()}
 
-    if isinstance(data, pd.Series):
-        return data.replace({np.nan: None}).to_dict()
-
-    if isinstance(data, (np.integer, np.floating)):
-        return data.item()
-
-    if isinstance(data, np.ndarray):
-        return data.tolist()
+    if isinstance(data, list):
+        return [_serialize_data(v) for v in data]
 
     if isinstance(data, (datetime, date)):
         return data.isoformat()
 
     if isinstance(data, Decimal):
         return float(data)
-
-    if isinstance(data, list):
-        return [_serialize_data(v) for v in data]
-
-    if isinstance(data, dict):
-        return {k: _serialize_data(v) for k, v in data.items()}
 
     return data
 
@@ -67,7 +51,7 @@ def _serialize_data(data):
 @router.post("", summary="Generar reportes")
 def generar_reportes(
     filtros: ReportesFiltros,
-    service: ReportesService = Depends(get_reportes_service)
+    service: ReportesService = Depends(get_reportes_service),
 ):
     """
     Body esperado:
@@ -84,26 +68,22 @@ def generar_reportes(
     if filtros.desde > filtros.hasta:
         raise HTTPException(
             status_code=400,
-            detail="La fecha 'desde' no puede ser mayor que 'hasta'"
+            detail="La fecha 'desde' no puede ser mayor que 'hasta'",
         )
-
-    # 🔎 LOG ÚNICO (como pediste)
-    print("🟥 AGRUPAR:", filtros.agrupar.lower())
 
     # ─────────────────────────
     # Delegar a Service
     # ─────────────────────────
-    resultado = service._generar(
+    resultado = service.generar(
         desde=filtros.desde,
         hasta=filtros.hasta,
-        agrupar=filtros.agrupar
+        agrupar=filtros.agrupar,
+        kpis=filtros.kpis if hasattr(filtros, "kpis") else None,
     )
 
-    # Debug útil
-    if resultado.get("general"):
-        print("🟩 PUNTOS GENERAL:", len(resultado["general"]["labels"]))
-
     # ─────────────────────────
-    # Serializar salida
+    # Respuesta serializada
     # ─────────────────────────
-    return JSONResponse(content=_serialize_data(resultado))
+    return JSONResponse(
+        content=_serialize_data(resultado)
+    )

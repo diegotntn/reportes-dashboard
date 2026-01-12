@@ -1,74 +1,174 @@
-/* Reset */
-@import url('./reset.css');
+/* ======================================================
+   main.css
+   Estilos base del Dashboard de Reportes
+   ------------------------------------------------------
+   RESPONSABILIDAD:
+   - Layout general
+   - Tabs + panels (visibilidad por clase .active)
+   - Componentes comunes (cards, grids, utilidades)
+   - Contenedores de gráficas (Chart.js / Plotly)
+====================================================== */
 
-/* Variables */
+/* ======================================================
+   Reset & Variables
+====================================================== */
+@import url('./reset.css');
 @import url('./variables.css');
 
-/* ───────── Estilos globales ───────── */
-
-body {
-  font-family: var(--font-base);
-  background-color: var(--color-bg);
-  color: var(--color-text-primary);
-  font-size: 14px;
+/* ======================================================
+   Global
+====================================================== */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
 }
 
-/* ───────── Layout base ───────── */
+html,
+body {
+  height: 100%;
+}
 
+body {
+  margin: 0;
+  font-family: var(--font-base);
+  background: var(--color-bg);
+  color: var(--color-text-primary);
+  font-size: 14px;
+  line-height: 1.45;
+}
+
+/* Links / botones */
+a {
+  color: inherit;
+  text-decoration: none;
+}
+
+button {
+  font: inherit;
+}
+
+/* ======================================================
+   Screen layout
+====================================================== */
 .reportes-screen {
   padding: var(--space-lg);
   display: flex;
   flex-direction: column;
   gap: var(--space-lg);
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
-/* ───────── Filtros ───────── */
-
-.reportes-filters {
-  background: var(--color-surface);
-  border: 1px solid var(--color-border);
-  border-radius: var(--radius-md);
-  padding: var(--space-md);
-  box-shadow: var(--shadow-sm);
-}
-
-/* ───────── Tabs ───────── */
-
-.reportes-tabs {
-  display: flex;
-  gap: var(--space-sm);
-  border-bottom: 1px solid var(--color-border);
-}
-
-.tab-button {
-  padding: var(--space-sm) var(--space-md);
-  font-weight: 500;
-  color: var(--color-text-secondary);
-  border-bottom: 2px solid transparent;
-  transition: all var(--transition-fast);
-}
-
-.tab-button:hover {
-  color: var(--color-primary);
-}
-
-.tab-button.active {
-  color: var(--color-primary);
-  border-bottom-color: var(--color-primary);
-}
-
-/* ───────── Contenido ───────── */
-
+/* ======================================================
+   Contenedores principales
+====================================================== */
+.reportes-filters,
 .reportes-content {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
   border-radius: var(--radius-md);
-  padding: var(--space-lg);
   box-shadow: var(--shadow-sm);
 }
 
-/* ───────── Panels ───────── */
+.reportes-filters {
+  padding: var(--space-md);
+}
 
+.reportes-content {
+  padding: var(--space-lg);
+}
+
+/* ======================================================
+   Forms (filtros)
+====================================================== */
+.filters-form {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-md);
+  align-items: end;
+}
+
+.filters-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 13px;
+  color: var(--color-text-secondary);
+  min-width: 180px;
+}
+
+.filters-form input,
+.filters-form select {
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-primary);
+  outline: none;
+}
+
+.filters-form input:focus,
+.filters-form select:focus {
+  border-color: var(--color-primary);
+}
+
+.filters-form button[type="submit"] {
+  padding: 10px 14px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-primary);
+  background: var(--color-primary);
+  color: #fff;
+  cursor: pointer;
+  font-weight: 600;
+}
+
+.filters-form button[type="submit"]:hover {
+  filter: brightness(0.95);
+}
+
+/* ======================================================
+   Tabs (navegación)
+   IMPORTANTE:
+   - Los botones deben tener class="tab-button"
+   - Los panels deben tener class="tab-panel"
+   - La visibilidad se controla con .active (NO inline style)
+====================================================== */
+.reportes-tabs {
+  display: flex;
+  gap: var(--space-sm);
+  border-bottom: 1px solid var(--color-border);
+  padding-bottom: 6px;
+  flex-wrap: wrap;
+}
+
+.tab-button {
+  appearance: none;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+
+  padding: 10px 12px;
+  border-radius: var(--radius-sm);
+
+  font-weight: 600;
+  color: var(--color-text-secondary);
+  transition: background var(--transition-fast), color var(--transition-fast);
+}
+
+.tab-button:hover {
+  color: var(--color-primary);
+  background: rgba(0, 0, 0, 0.04);
+}
+
+.tab-button.active {
+  color: var(--color-primary);
+  background: rgba(0, 0, 0, 0.06);
+}
+
+/* ======================================================
+   Panels (tabs)
+====================================================== */
 .tab-panel {
   display: none;
 }
@@ -77,8 +177,48 @@ body {
   display: block;
 }
 
-/* ───────── Cards (KPIs / bloques) ───────── */
+/* ======================================================
+   View header / controles
+====================================================== */
+.view-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-md);
+  margin-bottom: var(--space-md);
+}
 
+.view-header h3 {
+  margin: 0;
+  font-size: 16px;
+}
+
+.general-controls,
+.pasillos-controls {
+  display: flex;
+  gap: var(--space-sm);
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.general-controls label,
+.pasillos-controls label {
+  font-size: 13px;
+  color: var(--color-text-secondary);
+}
+
+.general-controls select,
+.pasillos-controls select {
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  color: var(--color-text-primary);
+}
+
+/* ======================================================
+   Cards
+====================================================== */
 .card {
   background: var(--color-surface);
   border: 1px solid var(--color-border);
@@ -90,16 +230,66 @@ body {
 .card-title {
   font-size: 13px;
   color: var(--color-text-secondary);
-  margin-bottom: var(--space-xs);
+  margin: 0 0 var(--space-xs) 0;
 }
 
 .card-value {
   font-size: 24px;
-  font-weight: 600;
+  font-weight: 700;
+  margin: 0;
 }
 
-/* ───────── Utilidades ───────── */
+/* Estado vacío */
+.empty-state h4 {
+  margin: 0 0 6px 0;
+  font-size: 14px;
+}
 
+.empty-state p {
+  margin: 0;
+}
+
+/* ======================================================
+   KPIs / grids
+====================================================== */
+.kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: var(--space-md);
+  margin-top: var(--space-md);
+}
+
+/* ======================================================
+   Pasillos
+====================================================== */
+.pasillos-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(320px, 1fr));
+  gap: var(--space-md);
+}
+
+.pasillos-grid fieldset {
+  border: 1px solid var(--color-border);
+  border-radius: var(--radius-md);
+  padding: var(--space-md);
+  margin: 0;
+}
+
+.pasillos-grid legend {
+  padding: 0 6px;
+  font-weight: 700;
+  color: var(--color-text-secondary);
+}
+
+/* Contenedor de Plotly */
+.plotly-chart {
+  width: 100%;
+  min-height: 320px;
+}
+
+/* ======================================================
+   Utilidades
+====================================================== */
 .text-muted {
   color: var(--color-text-muted);
 }
@@ -116,35 +306,12 @@ body {
   color: var(--color-danger);
 }
 
-.kpi-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
-  gap: var(--space-md);
-  margin-top: var(--space-md);
-}
-
+/* ======================================================
+   General view
+====================================================== */
 .general-placeholder {
   margin-top: var(--space-lg);
   font-size: 13px;
-}
-
-.period-tabs {
-  display: flex;
-  gap: var(--space-sm);
-  margin: var(--space-md) 0;
-}
-
-.period-btn {
-  padding: 6px 14px;
-  border-radius: var(--radius-sm);
-  border: 1px solid var(--color-border);
-  color: var(--color-text-secondary);
-}
-
-.period-btn.active {
-  background: var(--color-primary);
-  color: #fff;
-  border-color: var(--color-primary);
 }
 
 .metric-selector {
@@ -154,6 +321,42 @@ body {
   align-items: center;
 }
 
+/* ======================================================
+   Periodos / sub-tabs
+====================================================== */
+.period-tabs {
+  display: flex;
+  gap: var(--space-sm);
+  margin: var(--space-md) 0;
+  flex-wrap: wrap;
+}
+
+.period-btn {
+  padding: 8px 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--color-border);
+  background: transparent;
+  cursor: pointer;
+  color: var(--color-text-secondary);
+}
+
+.period-btn.active {
+  background: var(--color-primary);
+  color: #fff;
+  border-color: var(--color-primary);
+}
+
+/* ======================================================
+   Charts (Chart.js)
+====================================================== */
 .chart-container {
   height: 360px;
+  width: 100%;
+}
+
+/* Evita que canvas se colapse */
+canvas {
+  display: block;
+  width: 100%;
+  height: 100%;
 }

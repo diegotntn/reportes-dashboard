@@ -3,8 +3,6 @@ from pathlib import Path
 from dotenv import load_dotenv
 
 from backend.db.mongo.client import MongoClientProvider
-from backend.db.mongo.repos.productos_repo import ProductosRepo
-from backend.services.productos_service import ProductosService
 
 
 # ─────────────────────────────────────────────
@@ -17,11 +15,15 @@ load_dotenv(dotenv_path=ENV_PATH)
 
 
 # ─────────────────────────────────────────────
-# DB BASE
+# DB PROVIDER (SOLO LECTURA)
 # ─────────────────────────────────────────────
-def get_db():
+def get_db() -> MongoClientProvider:
     """
-    Devuelve el proveedor Mongo (infraestructura).
+    Devuelve el proveedor Mongo para consultas de REPORTES.
+    
+    ❌ No expone repos
+    ❌ No permite escritura
+    ✅ Solo acceso a colecciones
     """
     uri = os.getenv("MONGO_URI")
     db_name = os.getenv("MONGO_DB")
@@ -32,25 +34,3 @@ def get_db():
         )
 
     return MongoClientProvider(uri, db_name)
-
-
-# ─────────────────────────────────────────────
-# REPOSITORIOS
-# ─────────────────────────────────────────────
-def get_productos_repo():
-    """
-    Devuelve el repositorio de productos.
-    """
-    db_provider = get_db()
-    return ProductosRepo(db_provider._db)
-
-
-# ─────────────────────────────────────────────
-# SERVICES
-# ─────────────────────────────────────────────
-def get_productos_service():
-    """
-    Devuelve el servicio de productos correctamente cableado.
-    """
-    repo = get_productos_repo()
-    return ProductosService(repo)

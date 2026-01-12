@@ -2,32 +2,34 @@
  * api.js
  * -------------------------------------------------
  * Capa de comunicación con el backend
- * Responsabilidad única: HTTP / Fetch
- * NO maneja DOM
- * NO maneja lógica de UI
+ *
+ * RESPONSABILIDAD:
+ * - Comunicación HTTP (fetch)
+ *
+ * NO HACE:
+ * - Manejo de DOM
+ * - Lógica de UI
+ * - Render
  */
 
-/* ───────── Configuración base ───────── */
+/* ─────────────────────────
+   Configuración base
+───────────────────────── */
 
 const API_CONFIG = {
-  BASE_URL: 'http://127.0.0.1:8000/api',
-  TIMEOUT: 15000
+  BASE_URL: 'http://localhost:8000/api'
 };
 
 
-/* ───────── Fetch con timeout ───────── */
+/* ─────────────────────────
+   Fetch base (SIN abort, SIN timeout)
+───────────────────────── */
 
-async function fetchWithTimeout(url, options = {}) {
-  const controller = new AbortController();
-  const timeoutId = setTimeout(
-    () => controller.abort(),
-    API_CONFIG.TIMEOUT
-  );
-
+async function fetchBase(url, options = {}) {
   try {
     const response = await fetch(url, {
+      mode: 'cors',
       ...options,
-      signal: controller.signal,
       headers: {
         'Content-Type': 'application/json',
         ...(options.headers || {})
@@ -35,8 +37,15 @@ async function fetchWithTimeout(url, options = {}) {
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`HTTP ${response.status}: ${errorText}`);
+      const text = await response.text();
+      throw new Error(`HTTP ${response.status} · ${text}`);
+    }
+
+    // Si no hay cuerpo JSON (204, etc.)
+    const contentType = response.headers.get('content-type') || '';
+    if (!contentType.includes('application/json')) {
+      console.warn('⚠️ Respuesta sin JSON:', url);
+      return null;
     }
 
     return await response.json();
@@ -44,14 +53,13 @@ async function fetchWithTimeout(url, options = {}) {
   } catch (error) {
     console.error('❌ Error API:', error.message);
     throw error;
-
-  } finally {
-    clearTimeout(timeoutId);
   }
 }
 
 
-/* ───────── API genérica ───────── */
+/* ─────────────────────────
+   API genérica
+───────────────────────── */
 
 export async function apiGet(path, params = {}) {
   const url = new URL(API_CONFIG.BASE_URL + path);
@@ -62,41 +70,80 @@ export async function apiGet(path, params = {}) {
     }
   });
 
-  return fetchWithTimeout(url.toString(), { method: 'GET' });
+  return fetchBase(url.toString(), { method: 'GET' });
 }
 
 
 export async function apiPost(path, data = {}) {
-  return fetchWithTimeout(
-    API_CONFIG.BASE_URL + path,
-    {
-      method: 'POST',
-      body: JSON.stringify(data)
-    }
-  );
+  return fetchBase(API_CONFIG.BASE_URL + path, {
+    method: 'POST',
+    body: JSON.stringify(data)
+  });
 }
 
 
-/* ───────── ENDPOINTS ESPECÍFICOS ───────── */
+/* ─────────────────────────
+   Endpoints específicos
+───────────────────────── */
 
-// 🔴 AQUÍ ESTABA EL PROBLEMA LÓGICO (NO TÉCNICO)
+/**
+ * Generar reporte principal
+ */
 export async function generarReporte(filtros = {}) {
 
-  // 🔎 LOG ÚNICO Y CLARO (solo lo que te interesa)
-  console.log('📤 AGRUPAR ENVIADO:', filtros.agrupar);
+  // Log de intención (request)
+  console.groupCollapsed('📤 [API] Generando reporte');
+  console.log('Filtros enviados:', {
+    desde: filtros.desde,
+    hasta: filtros.hasta,
+    agrupar: filtros.agrupar
+  });
+  console.groupEnd();
 
-  // 🛡️ Payload explícito y seguro
   const payload = {
     desde: filtros.desde,
     hasta: filtros.hasta,
     agrupar: filtros.agrupar
   };
 
-  return apiPost('/reportes', payload);
+  const resultado = await apiPost('/reportes', payload);
+
+  // 🔍 LOG CRÍTICO: estructura REAL del backend
+  console.groupCollapsed('🧪 [API] Resultado crudo del backend');
+
+  console.log('▶ Resultado completo:', resultado);
+
+  console.log('▶ resultado.por_pasillo:', resultado?.por_pasillo);
+  console.log(
+    '   claves por_pasillo:',
+    resultado?.por_pasillo ? Object.keys(resultado.por_pasillo) : '❌ no existe'
+  );
+
+  console.log('▶ resultado.graficas:', resultado?.graficas);
+  console.log(
+    '   graficas.por_pasillo:',
+    resultado?.graficas?.por_pasillo
+  );
+  console.log(
+    '   claves graficas.por_pasillo:',
+    resultado?.graficas?.por_pasillo
+      ? Object.keys(resultado.graficas.por_pasillo)
+      : '❌ no existe'
+  );
+
+  console.log('▶ resultado.kpis:', resultado?.kpis);
+  console.log('▶ resultado.resumen:', resultado?.resumen);
+
+  console.groupEnd();
+
+  return resultado;
 }
 
 
-// Otros endpoints
+/* ─────────────────────────
+   Otros endpoints
+───────────────────────── */
+
 export async function obtenerProductos() {
   return apiGet('/productos');
 }
@@ -110,11 +157,13 @@ export async function obtenerDevoluciones(filtros = {}) {
 }
 
 
-/* ───────── Helper opcional ───────── */
+/* ─────────────────────────
+   Helper opcional
+───────────────────────── */
 
 export function normalizarError(error) {
   return {
-    mensaje: error.message || 'Error desconocido',
+    mensaje: error?.message || 'Error desconocido',
     timestamp: new Date().toISOString()
   };
 }

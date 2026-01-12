@@ -1,150 +1,126 @@
-ReporteSurtido/
+BACKEND
 │
-├── backend/                         # 🧠 BACKEND (PYTHON)
-│   │
-│   ├── main.py                      # 🚀 Arranque (API)
-│   │
-│   ├── docs/
-│   │   ├── arquitectura.md
-│   │   ├── convenciones_codigo.md
-│   │   └── decisiones_api.md
-│   │
-│   ├── domain/                      # 🧠 DOMINIO PURO
-│   │   ├── __init__.py
-│   │   ├── devolucion.py
-│   │   ├── producto.py
-│   │   ├── persona.py
-│   │   └── vendedor.py
-│   │
-│   │   # ❌ No Mongo
-│   │   # ❌ No FastAPI
-│   │   # ❌ No pandas
+├── main.py                         # Arranque API
 │
-│   ├── db/                          # 🔌 INFRAESTRUCTURA
-│   │   ├── __init__.py
-│   │   ├── base.py                  # Interfaces DB
-│   │   ├── factory.py               # get_db()
-│   │   │
-│   │   └── mongo/
-│   │       ├── client.py
-│   │       │
-│   │       ├── repos/               # CRUD
-│   │       │   ├── productos_repo.py
-│   │       │   ├── devoluciones_repo.py
-│   │       │   ├── personal_repo.py
-│   │       │   └── vendedores_repo.py
-│   │       │
-│   │       └── reportes/            # LECTURA PESADA
-│   │           ├── queries.py
-│   │           └── filtros.py
+├── docs/
+│   ├── arquitectura.md
+│   ├── decisiones_api.md
+│   └── contratos_reportes.md       # 🔑 JSONs esperados por frontend
+│
+├── domain/                          # MODELO CONCEPTUAL (solo lectura)
+│   ├── __init__.py
+│   ├── eventos.py                  # Eventos: devolución, venta, surtido
+│   ├── producto.py                 # Dimensión producto
+│   ├── persona.py                  # Dimensión persona
+│   └── ubicacion.py                # Dimensión pasillo / zona
+│   # ❌ sin validaciones de negocio
+│   # ❌ sin reglas mutables
+│
+├── db/
+│   ├── base.py                     # Interfaces de lectura
+│   ├── factory.py                  # get_db()
 │   │
-│   ├── services/                    # ⚙️ LÓGICA DE NEGOCIO
-│   │   ├── __init__.py
-│   │   │
-│   │   ├── productos_service.py
+│   └── mongo/
+│       ├── client.py               # MongoClientProvider (solo lectura)
+│       │
+│       └── reportes/
+│           ├── queries.py           # Consultas y accesos analíticos
+│           ├── pipelines.py         # Pipelines $match / $group
+│           └── filtros.py           # Filtros Mongo reutilizables
+│
+├── services/
+│   ├── __init__.py
+│   │
+│   └── reportes/
+│       ├── service.py               # Orquestador principal (delgado)
+│       │
+│       ├── data/                    # Acceso y preparación de datos
+│       │   ├── __init__.py
+│       │   ├── queries.py           # Llamadas a ReportesQueries
+│       │   └── dataframe.py         # obtener_dataframe + helpers
+│       │
+│       ├── aggregations/            # Agregaciones puras
+│       │   ├── __init__.py
+│       │   ├── general.py           # agrupa_general
+│       │   ├── zona.py              # agrupa_por_zona
+│       │   ├── pasillo.py           # agrupa_por_pasillo
+│       │   └── tabla.py             # tabla_final
+│       │
+│       ├── normalization/           # Limpieza y normalización
+│       │   ├── __init__.py
+│       │   ├── columnas.py          # Normalizar columnas
+│       │   ├── tipos.py             # Normalizar tipos
+│       │   └── ids.py               # Normalizar IDs
+│       │
+│       ├── temporal/                # Tiempo y periodos
+│       │   ├── __init__.py
+│       │   ├── periodo.py           # map_periodo
+│       │   └── series.py            # día / semana / mes / año
+│       │
+│       ├── personas/                # Dimensión analítica persona
+│       │   ├── __init__.py
+│       │   └── agrupacion.py        # agrupar_por_persona
+│       │
+│       ├── kpis.py                  # Cálculo de KPIs globales
+│       └── filtros.py               # Wrappers de filtros (fecha, etc.)
+│
+├── api/
+│   ├── app.py
+│   │
+│   ├── routes/
+│   │   └── reportes.py              # ❗ ÚNICA RUTA
+│   │
+│   ├── schemas/
+│   │   └── reportes.py              # Response ONLY
+│   │
+│   └── dependencies.py              # Inyección mínima
+│
+├── tests/
+│   └── reportes/
+│
+├── .env
+└── requirements.txt
 
-            vendedores_service.py
-│   │   │
-│   │   ├── devoluciones/
-│   │   │   ├── service.py
-│   │   │   ├── commands.py
-│   │   │   └── dto.py
-│   │   │
-│   │   ├── personal_service.py
+FRONTEND
+
+frontend/
+│
+├── index.html                  # Dashboard único
+│
+├── assets/
+│   ├── css/
+│   │   ├── reset.css
+│   │   ├── variables.css
+│   │   └── dashboard.css
+│   │
+│   ├── js/
+│   │   ├── api.js              # fetch GET /reportes
+│   │   ├── state.js            # filtros + periodo
+│   │   ├── router.js           # tabs internas
 │   │   │
 │   │   ├── reportes/
-│   │   │   ├── service.py
-│   │   │   └── normalizadores.py
+│   │   │   ├── index.js        # ReportesScreen
+│   │   │   ├── general.js
+│   │   │   ├── pasillos.js
+│   │   │   ├── personas.js
+│   │   │   ├── zonas.js
+│   │   │   └── detalle.js
 │   │   │
-│   │   └── shared/
-                texto.py
-│   │       ├── fechas.py
-│   │       └── validaciones.py
+│   │   └── charts.js           # Chart.js / Plotly
 │   │
-│   ├── api/                         # 🌐 API REST
-│   │   ├── __init__.py
-│   │   ├── app.py                   # FastAPI app
-│   │   │
-│   │   ├── routes/
-│   │   │   ├── productos.py
-│   │   │   ├── devoluciones.py
-│   │   │   ├── personal.py
-│   │   │   └── reportes.py
-│   │   │
-│   │   ├── schemas/                 # Request / Response
-│   │   │   ├── productos.py
-│   │   │   ├── devoluciones.py
-│   │   │   └── reportes.py
-│   │   │
-│   │   └── dependencies.py          # Inyección services
-│   │
-│   ├── scripts/
-│   │   ├── seed_devoluciones.py
-│   │   └── migraciones.py
-            exportar_excel.py
-           
-            utils/
-                formato.py
-
-│   ├── tests/
-│   │   ├── domain/
-│   │   ├── services/
-│   │   └── api/
-│   │
-│   ├── .env
-│   └── requirements.txt
+│   └── img/
 │
-├── frontend/                        # 🎨 FRONTEND WEB
-│   │
-│   ├── index.html                   # Dashboard principal
-│   │
-│   ├── assets/
-│   │   ├── css/
-│   │   │   ├── reset.css
-│   │   │   ├── variables.css
-│   │   │   └── main.css
-│   │   │
-│   │   ├── js/
-│   │   │   ├── api.js               # Fetch wrapper
-│   │   │   ├── state.js             # Estado global
-│   │   │   ├── router.js            # Navegación SPA
-│   │   │   │
-│   │   │   ├── modules/
-│   │   │   │   ├── productos.js
-│   │   │   │   ├── devoluciones/
-                        ├── index.js            # módulo orquestador
-                        ├── historial.js        # listado
-                        ├── registro.js         # alta
-                        └── edicion.js          # edición
-│   │   │   │   ├── personal.js
-│   │   │   │   └── reportes/
-                    ├── index.js        ← orquestador (ReportesScreen)
-                    ├── general.js      ← GeneralView
-                    ├── pasillos.js     ← PasillosView
-                    ├── personas.js     ← PersonasView
-                    ├── zonas.js        ← ZonasView
-                    └── detalle.js      ← DetalleView
-│   │   │   │
-│   │   │   └── charts.js            # Gráficas (Chart.js / Plotly)
-│   │   │
-│   │   └── img/
-│   │
-│   ├── views/                       # HTML parciales
-│   │   ├── productos.html
-│   │   ├── devoluciones.html
-            devoluciones_historial.html 
-            devoluciones_registro.html  
-│   │   ├── personal.html
-│   │   └── reportes.html
-│   │
-│   └── components/
-│       ├── navbar.html
-│       ├── filters.html
-│       └── table.html
-        ├── registro_form.html              ← RegistroForm
-    │   ├── articulo_form.html              ← ArticuloForm
-    │   └── articulos_table.html            ← ArticulosTable
+├── views/
+│   ├── dashboard.html
+│   ├── reportes_general.html
+│   ├── reportes_pasillos.html
+│   ├── reportes_personas.html
+│   └── reportes_detalle.html
 │
-├── docker-compose.yml               # (Opcional)
-├── README.md
-└── .gitignore
+├── components/
+│   ├── navbar.html
+│   ├── filtros.html
+│   ├── kpi_card.html
+│   └── chart_container.html
+│
+└── README.md
