@@ -5,6 +5,7 @@
  *
  * RESPONSABILIDAD:
  * - Comunicación HTTP (fetch)
+ * - Normalización mínima del payload de respuesta
  *
  * NO HACE:
  * - Manejo de DOM
@@ -20,9 +21,8 @@ const API_CONFIG = {
   BASE_URL: 'http://localhost:8000/api'
 };
 
-
 /* ─────────────────────────
-   Fetch base (SIN abort, SIN timeout)
+   Fetch base
 ───────────────────────── */
 
 async function fetchBase(url, options = {}) {
@@ -41,7 +41,6 @@ async function fetchBase(url, options = {}) {
       throw new Error(`HTTP ${response.status} · ${text}`);
     }
 
-    // Si no hay cuerpo JSON (204, etc.)
     const contentType = response.headers.get('content-type') || '';
     if (!contentType.includes('application/json')) {
       console.warn('⚠️ Respuesta sin JSON:', url);
@@ -55,7 +54,6 @@ async function fetchBase(url, options = {}) {
     throw error;
   }
 }
-
 
 /* ─────────────────────────
    API genérica
@@ -73,14 +71,12 @@ export async function apiGet(path, params = {}) {
   return fetchBase(url.toString(), { method: 'GET' });
 }
 
-
 export async function apiPost(path, data = {}) {
   return fetchBase(API_CONFIG.BASE_URL + path, {
     method: 'POST',
     body: JSON.stringify(data)
   });
 }
-
 
 /* ─────────────────────────
    Endpoints específicos
@@ -91,7 +87,7 @@ export async function apiPost(path, data = {}) {
  */
 export async function generarReporte(filtros = {}) {
 
-  // Log de intención (request)
+  // Log de request
   console.groupCollapsed('📤 [API] Generando reporte');
   console.log('Filtros enviados:', {
     desde: filtros.desde,
@@ -108,27 +104,32 @@ export async function generarReporte(filtros = {}) {
 
   const resultado = await apiPost('/reportes', payload);
 
-  // 🔍 LOG CRÍTICO: estructura REAL del backend
+  /* =====================================================
+     🔑 INYECCIÓN DE CONTEXTO (CLAVE PARA PASILLOS)
+     ===================================================== */
+
+  if (resultado && filtros?.desde && filtros?.hasta) {
+    resultado.rango = {
+      inicio: filtros.desde,
+      fin: filtros.hasta,
+      agrupar: filtros.agrupar
+    };
+  }
+
+  /* =====================================================
+     Logs de diagnóstico (estructura real)
+     ===================================================== */
+
   console.groupCollapsed('🧪 [API] Resultado crudo del backend');
 
   console.log('▶ Resultado completo:', resultado);
+
+  console.log('▶ resultado.rango:', resultado?.rango);
 
   console.log('▶ resultado.por_pasillo:', resultado?.por_pasillo);
   console.log(
     '   claves por_pasillo:',
     resultado?.por_pasillo ? Object.keys(resultado.por_pasillo) : '❌ no existe'
-  );
-
-  console.log('▶ resultado.graficas:', resultado?.graficas);
-  console.log(
-    '   graficas.por_pasillo:',
-    resultado?.graficas?.por_pasillo
-  );
-  console.log(
-    '   claves graficas.por_pasillo:',
-    resultado?.graficas?.por_pasillo
-      ? Object.keys(resultado.graficas.por_pasillo)
-      : '❌ no existe'
   );
 
   console.log('▶ resultado.kpis:', resultado?.kpis);
@@ -138,7 +139,6 @@ export async function generarReporte(filtros = {}) {
 
   return resultado;
 }
-
 
 /* ─────────────────────────
    Otros endpoints
@@ -155,7 +155,6 @@ export async function obtenerPersonal() {
 export async function obtenerDevoluciones(filtros = {}) {
   return apiGet('/devoluciones', filtros);
 }
-
 
 /* ─────────────────────────
    Helper opcional

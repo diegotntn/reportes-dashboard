@@ -1,2 +1,1 @@
-terminar demas pestañas
-reorganziar codigos grandes
+reorganizar pasillos en el front porque hay logica creo jaja
