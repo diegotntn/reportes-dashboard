@@ -5,15 +5,26 @@
 ====================================================== */
 
 /* ======================================================
-   Configuración base (NEUTRA y segura)
+   Configuración base para Chart.js
+   - Segura para grids (Todos separados)
+   - Compatible con eje time
+   - Estable en resize / zoom
 ====================================================== */
+
 const BASE_OPTIONS = {
   responsive: true,
-  maintainAspectRatio: false,
+
+  // 🔒 CLAVE: mantener proporción para evitar loops de resize
+  maintainAspectRatio: true,
+  aspectRatio: 2.5,
 
   interaction: {
     mode: 'index',
     intersect: false
+  },
+
+  animation: {
+    duration: 300
   },
 
   plugins: {
@@ -23,7 +34,12 @@ const BASE_OPTIONS = {
       labels: {
         usePointStyle: true,
         boxWidth: 8,
-        color: '#374151'
+        padding: 16,
+        color: '#374151',
+        font: {
+          size: 12,
+          weight: '500'
+        }
       }
     },
 
@@ -35,15 +51,42 @@ const BASE_OPTIONS = {
       padding: 10,
       borderWidth: 1,
       borderColor: '#374151',
+      displayColors: false,
       callbacks: {
         label(ctx) {
           const v = ctx.parsed?.y ?? ctx.parsed;
-          return ` ${ctx.dataset.label}: ${Number(v).toLocaleString('es-MX')}`;
+          return `${ctx.dataset.label}: ${Number(v).toLocaleString('es-MX')}`;
         }
+      }
+    }
+  },
+
+  scales: {
+    y: {
+      beginAtZero: true,
+      grid: {
+        color: '#e5e7eb',
+        drawBorder: false
+      },
+      ticks: {
+        color: '#6b7280',
+        maxTicksLimit: 6
+      }
+    },
+
+    x: {
+      grid: {
+        display: false
+      },
+      ticks: {
+        color: '#6b7280',
+        maxRotation: 0,
+        autoSkip: true
       }
     }
   }
 };
+
 
 /* ======================================================
    Utilidades internas
@@ -73,11 +116,10 @@ function adaptDensity(count) {
    - Convierte labels → {x,y} SOLO si es time
 ====================================================== */
 export function renderLineChart(canvas, labels, datasets, options = {}) {
-  console.group('📊 renderLineChart');
-  console.log('labels:', labels);
-  console.log('datasets:', datasets);
-  console.log('options.scales.x:', options?.scales?.x);
-  console.groupEnd();
+  console.log('📐 Chart container size', {
+      canvas: canvas,
+      parent: canvas.parentElement?.getBoundingClientRect()
+    });
 
   destroyIfExists(canvas);
 

@@ -1,24 +1,27 @@
 /* ======================================================
-   PasillosView Controller - VERSIÓN CON DIAGNÓSTICO
+   PasillosView Controller
    =======================
-   RESPONSABILIDADES:
-   - Renderizar información por pasillo
-   - Permitir comparación visual
-   - Gestionar modo de visualización (UI)
-
-   NO HACE:
-   - Fetch
-   - Backend
-   - Timing hacks
+   - Usa Chart.js vía charts.js (mismo look & feel que General)
+   - Eje diario completo (días sin datos = 0)
+   - Escala Y compartida en "Todos separados"
+   - FIX: evita “crecer infinitamente” en Todos separados
 ====================================================== */
 
-console.log('🟢 PasillosView cargado - VERSIÓN DIAGNÓSTICO');
+import { renderLineChart } from '../charts.js';
 
 /* ======================================================
    CONSTANTES
 ====================================================== */
 const MODOS = ['Individual', 'Comparación', 'Todos separados'];
 const PASILLOS_VALIDOS = ['P1', 'P2', 'P3', 'P4'];
+
+const COLORES = ['#2563eb', '#059669', '#d97706', '#dc2626'];
+const COLORES_BG = [
+  'rgba(37,99,235,.15)',
+  'rgba(5,150,105,.15)',
+  'rgba(217,119,6,.15)',
+  'rgba(220,38,38,.15)'
+];
 
 /* ======================================================
    ESTADO LOCAL
@@ -28,140 +31,35 @@ let modoActual = MODOS[0];
 let pasilloActual = null;
 let kpiActual = 'importe';
 let ultimoResultado = null;
-let diagnosticoActivado = true; // Cambiar a false una vez resuelto
 
 /* ======================================================
    EVENTOS GLOBALES
 ====================================================== */
-
-// Llegan datos (aunque pasillos no esté visible)
 window.addEventListener('reportes:actualizados', e => {
-  console.log('📊 [PasillosView] Datos actualizados recibidos');
-  console.log('📊 Evento completo:', e);
-  console.log('📊 e.detail:', e.detail);
   ultimoResultado = e.detail;
-  
-  if (diagnosticoActivado) {
-    console.log('📊 Ultimo resultado almacenado:', ultimoResultado);
-    console.log('📊 ¿Tiene por_pasillo?:', ultimoResultado?.por_pasillo ? 'SÍ' : 'NO');
-    if (ultimoResultado?.por_pasillo) {
-      console.log('📊 Claves en por_pasillo:', Object.keys(ultimoResultado.por_pasillo));
-    }
+  if (document.getElementById('tab-pasillos')?.classList.contains('active')) {
+    renderSeguro();
   }
 });
 
-// Vista HTML ya montada → ahora SÍ se puede renderizar
 window.addEventListener('reportes:vista-montada', e => {
-  console.log('🎯 [PasillosView] Evento vista-montada recibido');
-  console.log('🎯 Detalles del evento:', e.detail);
-  
-  if (e.detail?.tab !== 'pasillos') {
-    console.log('🎯 Ignorando evento - no es para pestaña pasillos');
-    return;
-  }
-
-  console.log('✅ [PasillosView] vista-montada para pestaña "pasillos"');
-  
-  if (diagnosticoActivado) {
-    console.log('🔍 DIAGNÓSTICO INICIADO =======================');
-    console.log('🔍 1. Verificando estado de datos...');
-    console.log('🔍    ¿Hay ultimoResultado?:', ultimoResultado ? 'SÍ' : 'NO');
-    console.log('🔍    ¿Tiene por_pasillo?:', ultimoResultado?.por_pasillo ? 'SÍ' : 'NO');
-    
-    console.log('🔍 2. Verificando DOM...');
-    console.log('🔍    ¿Existe tab-pasillos?:', document.getElementById('tab-pasillos') ? 'SÍ' : 'NO');
-    
-    const tab = document.getElementById('tab-pasillos');
-    if (tab) {
-      console.log('🔍    InnerHTML de tab-pasillos:');
-      console.log(tab.innerHTML);
-      console.log('🔍    Longitud HTML:', tab.innerHTML.length);
-      console.log('🔍    ¿Tiene clase pasillos-controls?:', tab.querySelector('.pasillos-controls') ? 'SÍ' : 'NO');
-      console.log('🔍    ¿Tiene id pasillos-container?:', tab.querySelector('#pasillos-container') ? 'SÍ' : 'NO');
-    }
-    
-    console.log('🔍 3. Verificando toda la página...');
-    console.log('🔍    Elementos con clase "pasillos-controls":', document.querySelectorAll('.pasillos-controls').length);
-    console.log('🔍    Elementos con id "pasillos-container":', document.querySelectorAll('#pasillos-container').length);
-    
-    console.log('🔍 4. Mostrando estructura del DOM completo...');
-    console.log('🔍    body.innerHTML (primeros 500 chars):', document.body.innerHTML.substring(0, 500));
-  }
-
-  if (!ultimoResultado) {
-    console.warn('⚠️ No hay datos para pasillos aún - esperando evento reportes:actualizados');
-    return;
-  }
-
-  renderSeguro();
+  if (e.detail?.tab !== 'pasillos') return;
+  ultimoResultado ? renderSeguro() : mostrarEstadoEspera();
 });
 
 /* ======================================================
-   RENDER SEGURO CON REINTENTOS INTELIGENTES
+   RENDER SEGURO
 ====================================================== */
 function renderSeguro() {
-  console.log('🔄 [PasillosView] Iniciando renderSeguro()');
-  
-  if (diagnosticoActivado) {
-    console.log('🔄 Estado al inicio de renderSeguro:');
-    console.log('🔄   ultimoResultado:', ultimoResultado);
-    console.log('🔄   dataPorPasillo:', dataPorPasillo);
-  }
-  
+  if (!ultimoResultado) return mostrarEstadoEspera();
+
   const tab = document.getElementById('tab-pasillos');
-  if (!tab) {
-    console.error('❌ CRÍTICO: tab-pasillos no existe en el DOM');
-    console.error('❌ Todos los elementos con "tab-" en el documento:');
-    document.querySelectorAll('[id^="tab-"]').forEach(el => {
-      console.error(`   - ${el.id}`);
-    });
-    return;
-  }
+  if (!tab) return;
 
-  console.log('✅ tab-pasillos encontrado');
-  
-  // Buscar elementos con múltiples estrategias
-  let controls = tab.querySelector('.pasillos-controls');
-  let container = tab.querySelector('#pasillos-container');
-  
-  console.log('🔎 Buscando elementos dentro de tab-pasillos...');
-  console.log('🔎 controls (primer intento):', controls);
-  console.log('🔎 container (primer intento):', container);
-  
-  // Si no los encuentra, intentar buscarlos en todo el documento
-  if (!controls) {
-    controls = document.querySelector('.pasillos-controls');
-    console.log('🔎 controls (búsqueda global):', controls);
-  }
-  
-  if (!container) {
-    container = document.getElementById('pasillos-container');
-    console.log('🔎 container (búsqueda global):', container);
-  }
-  
-  // Si aún no los encuentra, crear elementos temporales
-  if (!controls || !container) {
-    console.warn('⚠️ Elementos no encontrados. Creando elementos temporales...');
-    
-    if (!controls) {
-      controls = document.createElement('div');
-      controls.className = 'pasillos-controls';
-      tab.appendChild(controls);
-      console.log('✅ controls creado temporalmente');
-    }
-    
-    if (!container) {
-      container = document.createElement('div');
-      container.id = 'pasillos-container';
-      tab.appendChild(container);
-      console.log('✅ container creado temporalmente');
-    }
-  }
+  const controls = tab.querySelector('.pasillos-controls');
+  const container = tab.querySelector('#pasillos-container');
+  if (!controls || !container) return;
 
-  console.log('✅ Elementos listos para renderizar');
-  console.log('✅ controls:', controls);
-  console.log('✅ container:', container);
-  
   renderPasillos(ultimoResultado, controls, container);
 }
 
@@ -169,357 +67,434 @@ function renderSeguro() {
    RENDER PRINCIPAL
 ====================================================== */
 function renderPasillos(resultado, controls, container) {
-  console.log('🧪 [PasillosView] Iniciando renderPasillos()');
-  
-  if (diagnosticoActivado) {
-    console.log('🧪 Parámetros recibidos:');
-    console.log('🧪   resultado:', resultado);
-    console.log('🧪   controls:', controls);
-    console.log('🧪   container:', container);
-    console.log('🧪   controls.innerHTML (antes):', controls.innerHTML.substring(0, 100));
-    console.log('🧪   container.innerHTML (antes):', container.innerHTML.substring(0, 100));
-  }
-
-  const raw = resultado?.por_pasillo ?? {};
-  dataPorPasillo = {};
-
-  console.log('📦 Datos brutos (por_pasillo):', raw);
-  console.log('📦 Claves en raw:', Object.keys(raw));
-
-  Object.entries(raw).forEach(([key, bloque]) => {
-    console.log(`📦 Procesando pasillo "${key}":`, bloque);
-    const p = normalizarPasillo(key);
-    console.log(`📦 Pasillo normalizado: "${key}" -> "${p}"`);
-    
-    if (p && bloque?.series?.length) {
-      dataPorPasillo[p] = bloque;
-      console.log(`✅ Pasillo "${p}" agregado con ${bloque.series.length} registros`);
-    } else {
-      console.log(`❌ Pasillo "${p}" descartado - ¿bloque?: ${!!bloque}, ¿series?: ${bloque?.series?.length || 0}`);
-    }
-  });
+  dataPorPasillo = extraerDatosPasillos(resultado);
 
   const pasillos = PASILLOS_VALIDOS.filter(p => dataPorPasillo[p]);
-  
-  console.log('📊 Pasillos válidos encontrados:', pasillos);
-  console.log('📊 dataPorPasillo final:', dataPorPasillo);
-
   controls.innerHTML = '';
-  limpiarPlotly(container);
   container.innerHTML = '';
 
   if (!pasillos.length) {
-    console.log('📭 No hay datos de pasillos - mostrando estado vacío');
-    container.innerHTML = `
-      <section class="card empty-state">
-        <h4>Reporte por pasillos</h4>
-        <p class="text-muted">
-          No hay datos por pasillo para el periodo seleccionado.
-        </p>
-        <p class="text-small">
-          Datos recibidos: ${ultimoResultado ? 'SÍ' : 'NO'}<br>
-          Claves en por_pasillo: ${Object.keys(raw).join(', ') || '(ninguna)'}
-        </p>
-      </section>
-    `;
+    container.innerHTML = estadoVacio();
     return;
   }
 
   if (!pasilloActual || !pasillos.includes(pasilloActual)) {
     pasilloActual = pasillos[0];
-    console.log(`🎯 Pasillo actual establecido a: ${pasilloActual}`);
   }
 
   const kpisDisponibles = ['importe', 'piezas', 'devoluciones']
-    .filter(k =>
-      dataPorPasillo[pasilloActual].series.some(pt => pt[k] != null)
-    );
-
-  console.log(`📈 KPIs disponibles para ${pasilloActual}:`, kpisDisponibles);
+    .filter(k => dataPorPasillo[pasilloActual].series.some(pt => pt[k] != null));
 
   if (!kpisDisponibles.includes(kpiActual)) {
     kpiActual = kpisDisponibles[0];
-    console.log(`📈 KPI actual establecido a: ${kpiActual}`);
   }
 
-  /* ───────── Controles UI ───────── */
-  console.log('🎛️ Creando controles UI...');
-  
+  // Controles UI
   controls.append(
     label('Modo:'),
-    select(MODOS, modoActual, v => {
-      console.log(`🎛️ Modo cambiado a: ${v}`);
-      modoActual = v;
-      renderActual(container);
-    }),
+    select(MODOS, modoActual, v => { modoActual = v; renderActual(container); }),
     label('Pasillo:'),
-    select(pasillos, pasilloActual, v => {
-      console.log(`🎛️ Pasillo cambiado a: ${v}`);
-      pasilloActual = v;
-      renderActual(container);
-    }),
+    select(pasillos, pasilloActual, v => { pasilloActual = v; renderActual(container); }),
     label('KPI:'),
-    select(kpisDisponibles, kpiActual, v => {
-      console.log(`🎛️ KPI cambiado a: ${v}`);
-      kpiActual = v;
-      renderActual(container);
-    })
+    select(kpisDisponibles, kpiActual, v => { kpiActual = v; renderActual(container); })
   );
 
-  console.log('🎛️ Controles creados, iniciando renderActual...');
   renderActual(container);
 }
 
 /* ======================================================
-   RENDER SEGÚN MODO
+   MODOS
 ====================================================== */
 function renderActual(container) {
-  console.log(`🎨 [PasillosView] renderActual() - Modo: ${modoActual}`);
-  
-  limpiarPlotly(container);
   container.innerHTML = '';
 
-  if (modoActual === 'Individual') {
-    console.log('🎨 Modo Individual seleccionado');
-    renderIndividual(container);
-  } else if (modoActual === 'Comparación') {
-    console.log('🎨 Modo Comparación seleccionado');
-    renderComparacion(container);
-  } else {
-    console.log('🎨 Modo Todos separados seleccionado');
-    renderTodos(container);
-  }
-  
-  console.log('🎨 Render completado');
+  if (modoActual === 'Individual') renderIndividual(container);
+  else if (modoActual === 'Comparación') renderComparacion(container);
+  else renderTodos(container);
 }
 
 /* ======================================================
-   MODOS DE VISUALIZACIÓN
+   GRÁFICAS (Chart.js)
 ====================================================== */
 function renderIndividual(container) {
-  console.log(`📊 renderIndividual() para pasillo: ${pasilloActual}`);
-  
   const bloque = dataPorPasillo[pasilloActual];
-  if (!bloque) {
-    console.error(`❌ No hay datos para pasillo ${pasilloActual}`);
-    return;
-  }
+  if (!bloque) return;
 
-  console.log(`📊 Datos para ${pasilloActual}:`, bloque);
-  console.log(`📊 KPI seleccionado: ${kpiActual}`);
-  console.log(`📊 Valores KPI:`, bloque.series.map(p => p[kpiActual] ?? 0));
+  // Calendario diario completo SOLO del rango del pasillo
+  const labelsISO = generarRangoFechasISO(bloque.series);
+  const { labelsDate, data } = normalizarSerieContra(labelsISO, bloque.series, kpiActual);
 
-  const chart = document.createElement('div');
-  chart.className = 'plotly-chart';
-  container.appendChild(chart);
+  const canvas = crearCanvas(container);
 
-  console.log('📊 Creando gráfico Plotly...');
-  
-  try {
-    Plotly.newPlot(chart, [{
-      x: bloque.series.map(p => p.fecha),
-      y: bloque.series.map(p => p[kpiActual] ?? 0),
-      type: 'scatter',
-      mode: 'lines+markers',
-      name: pasilloActual
-    }], {
-      title: `Tendencia · ${pasilloActual}`
-    }, { responsive: true });
-    
-    console.log('✅ Gráfico creado exitosamente');
-  } catch (error) {
-    console.error('❌ Error al crear gráfico Plotly:', error);
-  }
+  renderLineChart(
+    canvas,
+    labelsDate,
+    [{
+      label: pasilloActual,
+      data,
+      borderColor: COLORES[0],
+      backgroundColor: COLORES_BG[0],
+      // importante para "días sin datos = 0": no hace falta spanGaps, siempre hay valor
+      spanGaps: true
+    }],
+    opcionesTime(kpiActual, `Tendencia · ${pasilloActual}`)
+  );
 }
 
 function renderComparacion(container) {
-  console.log('📊 renderComparacion()');
-  
-  const traces = PASILLOS_VALIDOS
+  // Base = calendario global (unificado) para que comparen igual
+  const labelsISO = generarRangoFechasISO_GLOBAL(dataPorPasillo);
+  const labelsDate = labelsISO.map(iso => new Date(iso));
+
+  const canvas = crearCanvas(container);
+
+  const datasets = PASILLOS_VALIDOS
     .filter(p => dataPorPasillo[p])
-    .map(p => ({
-      x: dataPorPasillo[p].series.map(pt => pt.fecha),
-      y: dataPorPasillo[p].series.map(pt => pt[kpiActual] ?? 0),
-      type: 'scatter',
-      mode: 'lines+markers',
-      name: p
-    }));
+    .map((p, i) => {
+      const { data } = normalizarSerieContra(labelsISO, dataPorPasillo[p].series, kpiActual);
+      return {
+        label: p,
+        data,
+        borderColor: COLORES[i],
+        backgroundColor: COLORES_BG[i],
+        spanGaps: true
+      };
+    });
 
-  console.log(`📊 Traces generados: ${traces.length} pasillos`);
-  console.log('📊 Traces detalles:', traces.map(t => t.name));
+  if (!datasets.length) return;
 
-  if (!traces.length) {
-    console.error('❌ No hay traces para comparar');
-    return;
-  }
-
-  const chart = document.createElement('div');
-  chart.className = 'plotly-chart';
-  container.appendChild(chart);
-
-  try {
-    Plotly.newPlot(chart, traces, {
-      title: `Comparación · ${kpiActual.toUpperCase()}`,
-      legend: { orientation: 'h' }
-    }, { responsive: true });
-    
-    console.log('✅ Gráfico de comparación creado');
-  } catch (error) {
-    console.error('❌ Error al crear gráfico de comparación:', error);
-  }
+  renderLineChart(
+    canvas,
+    labelsDate,
+    datasets,
+    opcionesTime(kpiActual, `Comparación · ${kpiActual.toUpperCase()}`)
+  );
 }
 
 function renderTodos(container) {
-  console.log('📊 renderTodos()');
-  
   const grid = document.createElement('div');
   grid.className = 'pasillos-grid';
 
-  console.log('📊 Pasillos a renderizar:', PASILLOS_VALIDOS.filter(p => dataPorPasillo[p]));
+  /* ======================================================
+     1) Construir eje maestro ISO (YYYY-MM-DD)
+  ====================================================== */
+  const allDates = new Set();
 
   PASILLOS_VALIDOS.forEach(p => {
     const bloque = dataPorPasillo[p];
-    if (!bloque) {
-      console.log(`📊 Pasillo ${p} - sin datos, omitiendo`);
-      return;
+    if (!bloque) return;
+
+    for (const pt of (bloque.series || [])) {
+      const iso = toISODate(pt.fecha ?? pt.date ?? pt.Fecha);
+      if (iso) allDates.add(iso);
     }
-
-    console.log(`📊 Renderizando pasillo ${p}...`);
-    
-    const card = document.createElement('fieldset');
-    card.innerHTML = `<legend>${p}</legend>`;
-
-    const chart = document.createElement('div');
-    chart.className = 'plotly-chart';
-    card.appendChild(chart);
-
-    try {
-      Plotly.newPlot(chart, [{
-        x: bloque.series.map(pt => pt.fecha),
-        y: bloque.series.map(pt => pt[kpiActual] ?? 0),
-        type: 'scatter',
-        mode: 'lines+markers'
-      }], {
-        title: `Tendencia · ${p}`
-      }, { responsive: true });
-      
-      console.log(`✅ Gráfico para ${p} creado`);
-    } catch (error) {
-      console.error(`❌ Error al crear gráfico para ${p}:`, error);
-    }
-
-    grid.appendChild(card);
   });
 
+  const labelsISO = [...allDates].sort();
+
+  if (!labelsISO.length) {
+    container.innerHTML = estadoVacio('No hay fechas válidas.');
+    return;
+  }
+
+  /* ======================================================
+     2) Render por pasillo (escala Y LOCAL)
+  ====================================================== */
+  PASILLOS_VALIDOS.forEach((p, i) => {
+    const bloque = dataPorPasillo[p];
+    if (!bloque) return;
+
+    // Normalizar contra el MISMO eje X
+    const { labelsDate, data } =
+      normalizarSerieContra(labelsISO, bloque.series, kpiActual);
+
+    // 🔑 ESCALA LOCAL POR PASILLO
+    const localMax = Math.max(...data);
+    const suggestedMax = localMax > 0 ? localMax * 1.15 : 1;
+
+    /* ───────── Card ───────── */
+    const card = document.createElement('section');
+    card.className = 'card';
+
+    const h = document.createElement('h4');
+    h.textContent = p;
+
+    /* ───────── Wrapper estable ───────── */
+    const wrapper = document.createElement('div');
+    wrapper.style.height = '340px';        // ⬅️ más aire visual
+    wrapper.style.position = 'relative';
+
+    const canvas = document.createElement('canvas');
+    canvas.style.position = 'absolute';
+    canvas.style.inset = '0';
+
+    wrapper.appendChild(canvas);
+    card.append(h, wrapper);
+    grid.appendChild(card);
+
+    /* ───────── Chart ───────── */
+    renderLineChart(
+      canvas,
+      labelsDate,
+      [{
+        label: p,
+        data,
+        borderColor: COLORES[i],
+        backgroundColor: COLORES_BG[i],
+        fill: false,
+        tension: 0.25,
+        spanGaps: true,
+        pointRadius: 3,
+        pointHoverRadius: 5
+      }],
+      {
+        ...opcionesTime(kpiActual, `Tendencia · ${p}`),
+        scales: {
+          x: {
+            type: 'time',
+            time: { unit: 'day' }
+          },
+          y: {
+            beginAtZero: true,
+            suggestedMax,
+            ticks: {
+              maxTicksLimit: 6
+            }
+          }
+        }
+      }
+    );
+  });
+
+  container.innerHTML = '';
   container.appendChild(grid);
-  console.log('✅ Todos los pasillos renderizados');
+}
+
+
+/* ======================================================
+   NORMALIZACIÓN (días faltantes → 0)
+   - labelsISO: ['YYYY-MM-DD', ...] SIEMPRE creciente diario
+   - data: valores alineados a labelsISO
+====================================================== */
+function normalizarSerieContra(labelsISO, series, kpi) {
+  const labelsUnicas = [...new Set(labelsISO)].sort();
+
+  const map = new Map();
+  for (const p of series || []) {
+    const iso = toISODate(p.fecha ?? p.date ?? p.Fecha);
+    if (!iso) continue;
+
+    const prev = map.get(iso) ?? 0;
+    const val = Number(p[kpi] ?? 0) || 0;
+    map.set(iso, prev + val);
+  }
+
+  return {
+    labelsDate: labelsUnicas.map(iso => new Date(iso)),
+    data: labelsUnicas.map(iso => map.get(iso) ?? 0)
+  };
 }
 
 /* ======================================================
-   HELPERS
+   CALENDARIO (ISO) - POR PASILLO Y GLOBAL
 ====================================================== */
-function limpiarPlotly(root) {
-  if (typeof Plotly === 'undefined' || !root) {
-    console.log('⚠️ limpiarPlotly: Plotly no disponible o root inválido');
-    return;
+function generarRangoFechasISO(series) {
+  const fechas = (series || [])
+    .map(p => toISODate(p.fecha ?? p.date ?? p.Fecha))
+    .filter(Boolean)
+    .sort();
+
+  if (!fechas.length) return [];
+
+  return rangoISO(fechas[0], fechas[fechas.length - 1]);
+}
+
+function generarRangoFechasISO_GLOBAL(data) {
+  const all = [];
+
+  Object.values(data || {}).forEach(b => {
+    (b.series || []).forEach(p => {
+      const iso = toISODate(p.fecha ?? p.date ?? p.Fecha);
+      if (iso) all.push(iso);
+    });
+  });
+
+  all.sort();
+  if (!all.length) return [];
+
+  return rangoISO(all[0], all[all.length - 1]);
+}
+
+function rangoISO(inicioISO, finISO) {
+  const res = [];
+  let d = new Date(inicioISO);
+  const end = new Date(finISO);
+
+  // Normalizar a medianoche para evitar saltos raros
+  d.setHours(0, 0, 0, 0);
+  end.setHours(0, 0, 0, 0);
+
+  while (d <= end) {
+    res.push(d.toISOString().slice(0, 10));
+    d.setDate(d.getDate() + 1);
   }
-  
-  const charts = root.querySelectorAll('.plotly-chart');
-  console.log(`🧹 Limpiando ${charts.length} gráficos Plotly...`);
-  
-  charts.forEach(el => {
-    try { 
-      Plotly.purge(el);
-      console.log('✅ Gráfico purgado');
-    } catch (error) {
-      console.warn('⚠️ Error al purgar gráfico:', error);
+  return res;
+}
+
+function toISODate(x) {
+  if (!x) return null;
+
+  // Si ya viene como 'YYYY-MM-DD'
+  if (typeof x === 'string' && /^\d{4}-\d{2}-\d{2}$/.test(x)) return x;
+
+  const d = new Date(x);
+  if (Number.isNaN(d.getTime())) return null;
+
+  return d.toISOString().slice(0, 10);
+}
+
+/* ======================================================
+   ESCALA GLOBAL Y (basada en serie NORMALIZADA)
+====================================================== */
+function calcularMaxGlobalNormalizado(kpi, labelsISO) {
+  let max = 0;
+
+  Object.values(dataPorPasillo).forEach(b => {
+    const { data } = normalizarSerieContra(labelsISO, b.series, kpi);
+    for (const v of data) max = Math.max(max, Number(v) || 0);
+  });
+
+  return max || 1;
+}
+
+function calcularMinMaxGlobalNormalizado(kpi, labelsISO) {
+  let min = Infinity;
+  let max = 0;
+
+  Object.values(dataPorPasillo).forEach(b => {
+    const { data } = normalizarSerieContra(labelsISO, b.series, kpi);
+    for (const v of data) {
+      const n = Number(v) || 0;
+      if (n > 0) {
+        min = Math.min(min, n);
+        max = Math.max(max, n);
+      }
     }
   });
+
+  if (!isFinite(min)) min = 0;
+  if (max === 0) max = 1;
+
+  return { min, max };
+}
+
+/* ======================================================
+   EXTRACCIÓN DE DATOS
+====================================================== */
+function extraerDatosPasillos(resultado) {
+  const datos = {};
+  if (!resultado?.por_pasillo) return datos;
+
+  Object.entries(resultado.por_pasillo).forEach(([k, v]) => {
+    const p = normalizarPasillo(k);
+    if (!p) return;
+
+    if (Array.isArray(v?.series)) {
+      // aquí respetamos el payload tal cual
+      datos[p] = { series: v.series };
+    }
+  });
+
+  return datos;
+}
+
+/* ======================================================
+   HELPERS UI
+====================================================== */
+function crearCanvas(container) {
+  const c = document.createElement('canvas');
+  c.height = 300;
+  container.appendChild(c);
+  return c;
+}
+
+function opcionesTime(kpi, titulo) {
+  return {
+    plugins: {
+      title: { display: true, text: titulo }
+    },
+    scales: {
+      x: {
+        type: 'time',
+        time: { unit: 'day' }
+      },
+      y: {
+        title: { display: true, text: kpi }
+      }
+    }
+  };
+}
+
+function mostrarEstadoEspera() {
+  const c = document.getElementById('pasillos-container');
+  if (!c) return;
+  c.innerHTML = estadoVacio('Esperando datos…');
+}
+
+function estadoVacio(txt = 'No hay datos por pasillo.') {
+  return `
+    <section class="card empty-state">
+      <h4>Reporte por pasillos</h4>
+      <p class="text-muted">${txt}</p>
+    </section>
+  `;
 }
 
 function normalizarPasillo(p) {
-  if (!p) {
-    console.log('⚠️ normalizarPasillo: entrada vacía');
-    return null;
-  }
-  
+  if (!p) return null;
   const v = String(p).trim().toUpperCase();
-  console.log(`🔄 Normalizando "${p}" -> "${v}"`);
-  
-  if (PASILLOS_VALIDOS.includes(v)) {
-    console.log(`✅ Pasillo válido: ${v}`);
-    return v;
-  }
-  
-  if (/^[1-4]$/.test(v)) {
-    const normalizado = `P${v}`;
-    console.log(`✅ Pasillo normalizado: ${v} -> ${normalizado}`);
-    return normalizado;
-  }
-  
-  console.log(`❌ Pasillo inválido: ${v}`);
+  if (PASILLOS_VALIDOS.includes(v)) return v;
+  if (/^[1-4]$/.test(v)) return `P${v}`;
   return null;
 }
 
-function label(text) {
-  console.log(`🏷️ Creando label: ${text}`);
+function label(t) {
   const l = document.createElement('label');
-  l.textContent = text;
+  l.textContent = t;
   l.style.margin = '0 6px';
   return l;
 }
 
-function select(values, current, onChange) {
-  console.log(`🔘 Creando select con ${values.length} opciones, valor actual: ${current}`);
+function select(vals, cur, cb) {
   const s = document.createElement('select');
-  
-  values.forEach(v => {
+  vals.forEach(v => {
     const o = document.createElement('option');
     o.value = v;
     o.textContent = v;
     s.appendChild(o);
   });
-  
-  s.value = current;
-  s.addEventListener('change', () => {
-    console.log(`🔘 Select cambiado a: ${s.value}`);
-    onChange(s.value);
-  });
-  
+  s.value = cur;
+  s.onchange = () => cb(s.value);
   return s;
 }
 
-/* ======================================================
-   FUNCIÓN DE DIAGNÓSTICO MANUAL
-====================================================== */
-window.diagnosticarPasillos = function() {
-  console.log('🔬 DIAGNÓSTICO MANUAL DE PASILLOS ======================');
-  console.log('🔬 1. Estado interno:');
-  console.log('🔬    ultimoResultado:', ultimoResultado);
-  console.log('🔬    dataPorPasillo:', dataPorPasillo);
-  console.log('🔬    modoActual:', modoActual);
-  console.log('🔬    pasilloActual:', pasilloActual);
-  console.log('🔬    kpiActual:', kpiActual);
-  
-  console.log('🔬 2. DOM actual:');
-  console.log('🔬    tab-pasillos:', document.getElementById('tab-pasillos'));
-  console.log('🔬    tab-pasillos innerHTML (primeros 300 chars):', 
-    document.getElementById('tab-pasillos')?.innerHTML?.substring(0, 300) || 'NO EXISTE');
-  
-  console.log('🔬 3. Todos los elementos con id que contienen "pasillos":');
-  document.querySelectorAll('[id*="pasillos"]').forEach(el => {
-    console.log(`🔬    - ${el.id}:`, el);
-  });
-  
-  console.log('🔬 4. Si hay datos, intentar renderizar manualmente...');
-  if (ultimoResultado) {
-    console.log('🔬    Hay datos, llamando a renderSeguro()...');
-    renderSeguro();
-  } else {
-    console.log('🔬    No hay datos aún.');
-  }
-  
-  console.log('🔬 DIAGNÓSTICO COMPLETADO =========================');
-};
+function calcularYEscalaInteligente(kpi, labelsISO) {
+  const valores = [];
 
-console.log('✅ PasillosView listo - usa window.diagnosticarPasillos() para diagnóstico manual');
+  Object.values(dataPorPasillo).forEach(b => {
+    const { data } = normalizarSerieContra(labelsISO, b.series, kpi);
+    valores.push(...data.filter(v => v > 0));
+  });
+
+  if (!valores.length) return { min: 0, max: 1 };
+
+  valores.sort((a, b) => a - b);
+
+  const p95 = valores[Math.floor(valores.length * 0.95)];
+  const max = p95 * 1.15;
+
+  return {
+    min: 0,
+    max
+  };
+}
