@@ -10,6 +10,7 @@ def agrupa_general(df, kpis):
 
     RETORNA:
     List[dict] compatible con charts.js:
+
     [
       {
         "fecha": datetime,
@@ -35,12 +36,17 @@ def agrupa_general(df, kpis):
     if "persona_id" not in df.columns:
         raise ValueError("agrupa_general requiere columna 'persona_id'")
 
-    # Normalizar columnas KPI presentes
+    # ─────────────────────────────
+    # Determinar KPIs válidos
+    # ─────────────────────────────
     kpi_cols = []
+
     if kpis.get("importe") and "importe" in df.columns:
         kpi_cols.append("importe")
+
     if kpis.get("piezas") and "piezas" in df.columns:
         kpi_cols.append("piezas")
+
     if kpis.get("devoluciones") and "devoluciones" in df.columns:
         kpi_cols.append("devoluciones")
 
@@ -50,45 +56,62 @@ def agrupa_general(df, kpis):
     resultado = []
 
     # ─────────────────────────────
-    # Agrupar por fecha (GENERAL)
+    # Agrupación GENERAL por fecha
     # ─────────────────────────────
-    for fecha, df_fecha in df.groupby("fecha"):
+    for fecha, df_fecha in df.groupby("fecha", dropna=False):
 
         # ───────── KPIs globales
         kpis_globales = {}
-        for c in kpi_cols:
-            total = df_fecha[c].sum()
-            kpis_globales[c] = float(total) if c == "importe" else int(total)
+        for col in kpi_cols:
+            total = df_fecha[col].sum()
+            kpis_globales[col] = (
+                float(total) if col == "importe" else int(total)
+            )
 
         # ───────── KPIs por persona
         personas = []
 
-        for persona_id, df_p in df_fecha.groupby("persona_id"):
-            if not persona_id:
-                continue
+        for persona_id, df_persona in df_fecha.groupby("persona_id", dropna=False):
 
+            # Normalizar ID
+            persona_id_norm = persona_id if persona_id else "SIN_ASIGNACION"
+
+            # Resolver nombre de forma segura
+            nombre = None
+            if "persona_nombre" in df_persona.columns:
+                val = df_persona["persona_nombre"].iloc[0]
+                if val and str(val).strip():
+                    nombre = str(val)
+
+            if not nombre:
+                nombre = "Sin asignación"
+
+            # KPIs por persona
             kpis_persona = {}
-            for c in kpi_cols:
-                val = df_p[c].sum()
-                kpis_persona[c] = float(val) if c == "importe" else int(val)
+            for col in kpi_cols:
+                total = df_persona[col].sum()
+                kpis_persona[col] = (
+                    float(total) if col == "importe" else int(total)
+                )
 
             personas.append({
-                "id": persona_id,
-                # El nombre real se resuelve después (service / frontend)
-                "nombre": df_p.get("persona_nombre", [None])[0],
+                "id": persona_id_norm,
+                "nombre": nombre,
                 "kpis": kpis_persona
             })
 
-        # ───────── Armar punto temporal
+        # ───────── Punto temporal final
         resultado.append({
-            "fecha": fecha,                 # datetime (NO string)
-            "key": fecha.isoformat(),        # clave estable
-            "label": fecha.isoformat(),      # frontend decide formato
+            "fecha": fecha,                  # datetime real
+            "key": fecha.isoformat(),         # clave estable
+            "label": fecha.isoformat(),       # frontend decide formato
             "kpis": kpis_globales,
             "personas": personas
         })
 
+    # ─────────────────────────────
     # Orden cronológico estricto
+    # ─────────────────────────────
     resultado.sort(key=lambda x: x["fecha"])
 
     return resultado

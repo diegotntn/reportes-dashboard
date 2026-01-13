@@ -2,9 +2,6 @@
    charts.js
    Motor gráfico genérico para dashboards
    Chart.js 4.x
-   Soporta:
-   - Serie rica (1 línea)
-   - Multi-serie (comparación)
 ====================================================== */
 
 /* ======================================================
@@ -56,19 +53,20 @@ const BASE_OPTIONS = {
           const p = ctx.raw;
           if (!p?.kpis) return '';
 
-          const lines = [];
-          lines.push(`Total: ${Number(p.kpis.importe || 0).toLocaleString('es-MX')}`);
+          // 🔑 Resolver KPI igual que el dataset
+          const kpi =
+            ctx.dataset?.kpi ??
+            ctx.chart?.config?._config?.kpi ??
+            'importe';
 
-          if (Array.isArray(p.personas)) {
-            p.personas.forEach(per => {
-              lines.push(
-                `👤 ${per.nombre}: ${Number(per.kpis.importe || 0).toLocaleString('es-MX')}`
-              );
-            });
-          }
+          const valor =
+            p.kpis?.[kpi] ??
+            p.kpis?.importe ??
+            0;
 
-          return lines;
+          return `Total: ${Number(valor).toLocaleString('es-MX')}`;
         }
+
       }
     }
   },
@@ -104,10 +102,29 @@ function adaptDensity(count) {
 }
 
 /* ======================================================
-   DATASET BUILDER
+   KPI RESOLVER (CLAVE DE TODO)
+   - NO rompe nada
+   - Default: 'importe'
 ====================================================== */
 
-function buildDataset(serie, cfg, density) {
+function resolveKpi(p, cfg, payload) {
+  const kpi =
+    cfg?.kpi ??
+    payload?.kpi ??
+    'importe';
+
+  return Number(
+    p?.kpis?.[kpi] ??
+    p?.kpis?.importe ??
+    0
+  );
+}
+
+/* ======================================================
+   DATASET BUILDER (RETROCOMPATIBLE)
+====================================================== */
+
+function buildDataset(serie, cfg, density, payload) {
   return {
     label: cfg.label,
     borderColor: cfg.color,
@@ -120,7 +137,7 @@ function buildDataset(serie, cfg, density) {
 
     data: serie.map(p => ({
       x: p.fecha,
-      y: Number(p.kpis?.importe || 0),
+      y: resolveKpi(p, cfg, payload),
       ...p
     }))
   };
@@ -129,26 +146,22 @@ function buildDataset(serie, cfg, density) {
 /* ======================================================
    LINE CHART — UNA O VARIAS SERIES
 ====================================================== */
-/**
- * @param canvas HTMLCanvasElement
- * @param payload {
- *   periodo: 'dia'|'semana'|'mes'
- *   series: [
- *     { label, color, bg, serie[] }
- *   ]
- * }
- */
+
 export function renderLineChart(canvas, payload, options = {}) {
 
   destroyIfExists(canvas);
 
   if (!payload?.series || payload.series.length === 0) return;
 
-  const allPoints = payload.series.reduce((a, s) => a + s.serie.length, 0);
+  const allPoints = payload.series.reduce(
+    (a, s) => a + (s.serie?.length || 0),
+    0
+  );
+
   const density = adaptDensity(allPoints);
 
-  const datasets = payload.series.map((s, i) =>
-    buildDataset(s.serie, s, density)
+  const datasets = payload.series.map(s =>
+    buildDataset(s.serie, s, density, payload)
   );
 
   return new Chart(canvas, {
@@ -159,6 +172,11 @@ export function renderLineChart(canvas, payload, options = {}) {
     options: {
       ...BASE_OPTIONS,
       ...options,
+
+      plugins: {
+        ...BASE_OPTIONS.plugins,
+        ...(options.plugins || {})
+      },
 
       scales: {
         y: {
@@ -213,7 +231,7 @@ export function renderBarChart(canvas, general, options = {}) {
 }
 
 /* ======================================================
-   DONUT / PIE
+   DONUT / PIE (SIN CAMBIOS)
 ====================================================== */
 
 export function renderDonutChart(canvas, labels, data, options = {}) {

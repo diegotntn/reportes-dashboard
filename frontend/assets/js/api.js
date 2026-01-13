@@ -87,15 +87,6 @@ export async function apiPost(path, data = {}) {
  */
 export async function generarReporte(filtros = {}) {
 
-  // Log de request
-  console.groupCollapsed('📤 [API] Generando reporte');
-  console.log('Filtros enviados:', {
-    desde: filtros.desde,
-    hasta: filtros.hasta,
-    agrupar: filtros.agrupar
-  });
-  console.groupEnd();
-
   const payload = {
     desde: filtros.desde,
     hasta: filtros.hasta,
@@ -120,22 +111,6 @@ export async function generarReporte(filtros = {}) {
      Logs de diagnóstico (estructura real)
      ===================================================== */
 
-  console.groupCollapsed('🧪 [API] Resultado crudo del backend');
-
-  console.log('▶ Resultado completo:', resultado);
-
-  console.log('▶ resultado.rango:', resultado?.rango);
-
-  console.log('▶ resultado.por_pasillo:', resultado?.por_pasillo);
-  console.log(
-    '   claves por_pasillo:',
-    resultado?.por_pasillo ? Object.keys(resultado.por_pasillo) : '❌ no existe'
-  );
-
-  console.log('▶ resultado.kpis:', resultado?.kpis);
-  console.log('▶ resultado.resumen:', resultado?.resumen);
-
-  console.groupEnd();
 
   return resultado;
 }

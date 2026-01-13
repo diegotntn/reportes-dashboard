@@ -7,35 +7,39 @@
  * - Renderizar estructura base del dashboard
  * - Inicializar filtros
  * - Pedir datos al backend
- * - Mantener estado único de reportes
+ * - Distribuir resultados a las vistas
  *
  * NO HACE:
  * - Render de gráficas
- * - Control de tabs
- * - Lógica de negocio
+ * - Lógica interna de cada vista
  */
 
 // ─────────────────────────────
-// IMPORTS OBLIGATORIOS
-// (registran listeners de vistas)
+// IMPORTS DE VISTAS
+// (registran listeners globales)
 // ─────────────────────────────
+
+// ⛔ Vistas legacy (siguen usando eventos globales)
 import './general.js';
 import './pasillos.js';
-import './personas.js';
 import './zonas.js';
 import './detalle.js';
 
+// ✅ Personas (nueva arquitectura)
+import { cargarResultadoPersonas } from './personas/index.js';
+
+// Infraestructura
 import { generarReporte } from '../api.js';
 import { iniciarTabsReportes } from '../router.js';
 
 /* ======================================================
-   ESTADO ÚNICO (fuente de verdad)
+   ESTADO ÚNICO (fuente de verdad del dashboard)
 ====================================================== */
 let resultadoActual = null;
 let filtrosActuales = null;
 let inicializado = false;
 
-// 🔒 Candado de concurrencia (CRÍTICO)
+// 🔒 Candado de concurrencia
 let cargando = false;
 
 /* ======================================================
@@ -44,14 +48,10 @@ let cargando = false;
 export function renderReportesScreen(container) {
   console.group('🟢 ReportesScreen init');
 
-  // ─────────────────────────────
   // Estado inicial
-  // ─────────────────────────────
   filtrosActuales = filtrosPorDefecto();
 
-  // ⚠️ IMPORTANTE:
-  // Este innerHTML se ejecuta UNA SOLA VEZ.
-  // El router NUNCA vuelve a tocar esta estructura.
+  // HTML base (SE MONTA UNA SOLA VEZ)
   container.innerHTML = `
     <section class="card reportes-screen">
 
@@ -71,7 +71,7 @@ export function renderReportesScreen(container) {
         <button data-tab="detalle">Detalle</button>
       </nav>
 
-      <!-- Paneles (contenedores FIJOS) -->
+      <!-- Paneles -->
       <section id="tab-general" class="tab-panel"></section>
       <section id="tab-pasillos" class="tab-panel" style="display:none"></section>
       <section id="tab-personas" class="tab-panel" style="display:none"></section>
@@ -83,20 +83,14 @@ export function renderReportesScreen(container) {
 
   console.log('📦 DOM base de Reportes creado');
 
-  // ─────────────────────────────
-  // Inicializaciones (NO tocan tabs)
-  // ─────────────────────────────
+  // Inicializaciones
   initFiltros();
   initEventosGlobales();
 
-  // ─────────────────────────────
-  // Router (solo visibilidad + montaje HTML)
-  // ─────────────────────────────
+  // Router de tabs (solo visibilidad)
   iniciarTabsReportes('general');
 
-  // ─────────────────────────────
   // Fetch inicial (UNA sola vez)
-  // ─────────────────────────────
   if (!inicializado) {
     inicializado = true;
     actualizarReportes();
@@ -106,9 +100,8 @@ export function renderReportesScreen(container) {
   console.groupEnd();
 }
 
-
 /* ======================================================
-   Filtros
+   FILTROS
 ====================================================== */
 function initFiltros() {
   const container = document.getElementById('filters-container');
@@ -162,9 +155,10 @@ function initFiltros() {
 }
 
 /* ======================================================
-   Eventos globales (desde vistas)
+   EVENTOS GLOBALES
 ====================================================== */
 function initEventosGlobales() {
+  // Cambio de agrupación disparado por vistas legacy
   window.addEventListener('reportes:cambiar-agrupacion', e => {
     const agrupar = e.detail?.agrupar;
     if (!agrupar || agrupar === filtrosActuales.agrupar) return;
@@ -179,7 +173,7 @@ function initEventosGlobales() {
 }
 
 /* ======================================================
-   API (con bloqueo de concurrencia)
+   API (fetch + distribución de resultados)
 ====================================================== */
 async function actualizarReportes() {
   if (cargando) {
@@ -188,18 +182,20 @@ async function actualizarReportes() {
   }
 
   cargando = true;
-  console.log('🟡 Generando reportes', filtrosActuales);
 
   try {
     resultadoActual = await generarReporte(filtrosActuales);
     if (!resultadoActual) return;
 
-    // 🔔 Evento ÚNICO de datos
+    // 🔔 Vistas legacy (event-driven)
     window.dispatchEvent(
       new CustomEvent('reportes:actualizados', {
         detail: resultadoActual
       })
     );
+
+    // ✅ Personas (API directa, arquitectura nueva)
+    cargarResultadoPersonas(resultadoActual);
 
   } catch (err) {
     console.error('❌ Error al generar reportes', err);
@@ -210,7 +206,7 @@ async function actualizarReportes() {
 }
 
 /* ======================================================
-   Filtros por defecto
+   FILTROS POR DEFECTO
 ====================================================== */
 function filtrosPorDefecto() {
   const hoy = new Date();
@@ -224,7 +220,7 @@ function filtrosPorDefecto() {
 }
 
 /* ======================================================
-   Acceso controlado al estado (solo lectura)
+   ACCESO CONTROLADO AL ESTADO (solo lectura)
 ====================================================== */
 export function getResultadoActual() {
   return resultadoActual;

@@ -8,5 +8,3 @@ git status        ← ver qué cambió
 git add .         ← preparar cambios
 git commit -m ""  ← guardar cambios
 git push origin main        ← subir a GitHub
-
-

@@ -49,24 +49,17 @@ def obtener_dataframe(
 ):
     """
     Normaliza y ENRIQUECE el DataFrame base para reportes.
-
-    ENTRADA:
-    - df_detalle: DataFrame o list[dict] de eventos (devoluciones)
-    - asignaciones: list[dict] desde ReportesQueries.asignaciones()
-    - personas_map: dict { persona_id: nombre }
-
-    SALIDA:
-    - DataFrame listo para aggregations (con persona)
     """
 
     if df_detalle is None:
         return None
 
-    # ───────── Convertir a DataFrame
-    if not isinstance(df_detalle, pd.DataFrame):
-        df = pd.DataFrame(df_detalle)
-    else:
-        df = df_detalle.copy()
+    # Convertir a DataFrame
+    df = (
+        df_detalle.copy()
+        if isinstance(df_detalle, pd.DataFrame)
+        else pd.DataFrame(df_detalle)
+    )
 
     if df.empty:
         return None
@@ -78,12 +71,12 @@ def obtener_dataframe(
     if "devoluciones" not in df.columns:
         df["devoluciones"] = 1
 
-    # ───────── Enriquecimiento con PERSONA
+    # ───────── Enriquecimiento PERSONA (CLAVE)
     if asignaciones and "pasillo" in df.columns:
         df["persona_id"] = df.apply(
             lambda r: _resolver_persona(
-                r["pasillo"],
-                r["fecha"],
+                r.get("pasillo"),
+                r.get("fecha"),
                 asignaciones
             ),
             axis=1
@@ -91,12 +84,21 @@ def obtener_dataframe(
     else:
         df["persona_id"] = None
 
+    # ───────── Resolver nombre
     if personas_map:
         df["persona_nombre"] = df["persona_id"].map(personas_map)
     else:
         df["persona_nombre"] = None
 
-    # ───────── Fallback claro
+    # ───────── Fallback explícito
     df["persona_nombre"] = df["persona_nombre"].fillna("Sin asignación")
-
+    
+    print(
+        "[DEBUG DATAFRAME GENERAL]",
+        df[["fecha", "pasillo", "persona_id", "persona_nombre"]]
+        .drop_duplicates()
+        .head(20)
+    )
+    
     return df
+    

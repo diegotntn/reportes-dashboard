@@ -3,9 +3,9 @@ from typing import Dict, List, Optional, Any, Literal
 from datetime import date
 
 
-# ─────────────────────────
+# ─────────────────────────────
 # FILTROS DE ENTRADA
-# ─────────────────────────
+# ─────────────────────────────
 
 class ReportesFiltros(BaseModel):
     """
@@ -16,9 +16,9 @@ class ReportesFiltros(BaseModel):
     agrupar: Literal["Dia", "Semana", "Mes", "Anio"]
 
 
-# ─────────────────────────
+# ─────────────────────────────
 # CONFIGURACIÓN DE KPIs
-# ─────────────────────────
+# ─────────────────────────────
 
 class KPIsConfig(BaseModel):
     importe: bool = True
@@ -26,9 +26,9 @@ class KPIsConfig(BaseModel):
     devoluciones: bool = True
 
 
-# ─────────────────────────
-# RESUMEN GENERAL KPIs
-# ─────────────────────────
+# ─────────────────────────────
+# RESUMEN GLOBAL
+# ─────────────────────────────
 
 class ResumenKPIs(BaseModel):
     importe_total: float = 0.0
@@ -36,9 +36,9 @@ class ResumenKPIs(BaseModel):
     devoluciones_total: int = 0
 
 
-# ─────────────────────────
-# KPI POR PERSONA (tooltip)
-# ─────────────────────────
+# ─────────────────────────────
+# KPIs POR PERSONA (tooltip / breakdown)
+# ─────────────────────────────
 
 class PersonaKPI(BaseModel):
     id: Optional[str]
@@ -46,9 +46,9 @@ class PersonaKPI(BaseModel):
     kpis: Dict[str, float | int]
 
 
-# ─────────────────────────
-# PUNTO DE SERIE TEMPORAL
-# ─────────────────────────
+# ─────────────────────────────
+# PUNTO TEMPORAL (SERIE RICA)
+# ─────────────────────────────
 
 class PuntoSerie(BaseModel):
     """
@@ -57,24 +57,50 @@ class PuntoSerie(BaseModel):
     key: str
     label: str
     kpis: Dict[str, float | int]
-    personas: List[PersonaKPI]
+    personas: List[PersonaKPI] = []
 
 
-# ─────────────────────────
-# SERIE TEMPORAL RICA
-# ─────────────────────────
+# ─────────────────────────────
+# SERIE TEMPORAL
+# ─────────────────────────────
 
 class SerieTemporal(BaseModel):
     """
-    Serie temporal con personas por punto.
+    Serie temporal rica con personas por punto.
     """
     periodo: Literal["dia", "semana", "mes", "anio"]
     serie: List[PuntoSerie]
 
 
-# ─────────────────────────
+# ─────────────────────────────
+# TABLA POR PERSONA
+# ─────────────────────────────
+
+class PersonaTabla(BaseModel):
+    """
+    Tabla + resumen por persona (vista personas)
+    """
+    resumen: Dict[str, float | int]
+    tabla: List[Dict[str, Any]]
+
+
+# ─────────────────────────────
+# SERIES POR PERSONA (NUEVO)
+# ─────────────────────────────
+
+class PersonaSerie(BaseModel):
+    """
+    Serie temporal individual por persona
+    """
+    persona_id: str
+    nombre: str
+    periodo: Literal["dia", "semana", "mes", "anio"]
+    serie: List[PuntoSerie]
+
+
+# ─────────────────────────────
 # RESPUESTA FINAL DE REPORTES
-# ─────────────────────────
+# ─────────────────────────────
 
 class ReporteOut(BaseModel):
     # KPIs activos
@@ -83,13 +109,18 @@ class ReporteOut(BaseModel):
     # Resumen global
     resumen: ResumenKPIs
 
-    # Serie principal (gráfica)
+    # Serie principal (GENERAL)
     general: Optional[SerieTemporal] = None
 
-    # Otras vistas (tablas / breakdowns)
+    # Breakdown clásicos
     por_zona: Dict[str, Any] = {}
     por_pasillo: Dict[str, Any] = {}
-    por_persona: Dict[str, Any] = {}
+
+    # Personas (TABLA)
+    por_persona: Dict[str, PersonaTabla] = {}
+
+    # Personas (SERIES PARA GRÁFICAS)
+    personas_series: Dict[str, PersonaSerie] = {}
 
     # Tabla detalle
     tabla: List[Dict[str, Any]] = []

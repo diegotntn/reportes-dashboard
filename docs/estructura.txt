@@ -102,7 +102,19 @@ frontend/
 │   │   │   ├── index.js        # ReportesScreen
 │   │   │   ├── general.js
 │   │   │   ├── pasillos.js
-│   │   │   ├── personas.js
+│   │   │   ├── personas/
+            │   ├── index.js              # Orquestador (ANTES personas.js)
+            │   ├── state.js              # Estado y selección
+            │   ├── events.js             # window.addEventListener(...)
+            │   ├── adapter.js            # transformar datos backend → frontend
+            │   ├── ui.js  
+                    controls.js                # selects, canvas, grid, DOM helpers
+            │   ├── render/
+            │   │   ├── index.js          # renderizarSegunModo
+            │   │   ├── individual.js
+            │   │   ├── comparacion.js
+            │   │   └── todos.js
+            │   └── empty.js              # estadoVacio / mostrarEstadoEspera
 │   │   │   ├── zonas.js
 │   │   │   └── detalle.js
 │   │   │
