@@ -45,15 +45,15 @@ const BASE_OPTIONS = {
 
       callbacks: {
         title(items) {
-          const p = items?.[0]?.raw;
-          return p?.label ?? '';
+          const x = items?.[0]?.raw?.x;
+          if (!x) return '';
+          return new Date(x).toLocaleDateString('es-MX');
         },
 
         label(ctx) {
           const p = ctx.raw;
           if (!p?.kpis) return '';
 
-          // 🔑 Resolver KPI igual que el dataset
           const kpi =
             ctx.dataset?.kpi ??
             ctx.chart?.config?._config?.kpi ??
@@ -66,7 +66,6 @@ const BASE_OPTIONS = {
 
           return `Total: ${Number(valor).toLocaleString('es-MX')}`;
         }
-
       }
     }
   },
@@ -103,8 +102,6 @@ function adaptDensity(count) {
 
 /* ======================================================
    KPI RESOLVER (CLAVE DE TODO)
-   - NO rompe nada
-   - Default: 'importe'
 ====================================================== */
 
 function resolveKpi(p, cfg, payload) {
@@ -134,6 +131,7 @@ function buildDataset(serie, cfg, density, payload) {
     spanGaps: true,
     pointRadius: density.pointRadius,
     pointHoverRadius: density.pointRadius + 2,
+    kpi: cfg.kpi ?? payload.kpi,
 
     data: serie.map(p => ({
       x: p.fecha,
@@ -164,6 +162,12 @@ export function renderLineChart(canvas, payload, options = {}) {
     buildDataset(s.serie, s, density, payload)
   );
 
+  const unit =
+    payload.periodo === 'dia'    ? 'day'   :
+    payload.periodo === 'semana' ? 'week'  :
+    payload.periodo === 'mes'    ? 'month' :
+    'year';
+
   return new Chart(canvas, {
     type: 'line',
 
@@ -187,11 +191,14 @@ export function renderLineChart(canvas, payload, options = {}) {
         x: {
           type: 'time',
           time: {
-            unit:
-              payload.periodo === 'dia' ? 'day' :
-              payload.periodo === 'semana' ? 'week' :
-              payload.periodo === 'mes' ? 'month' :
-              'year'
+            unit,
+            tooltipFormat: 'dd/MM/yyyy',
+            displayFormats: {
+              day: 'dd/MM',
+              week: "'Sem' WW",
+              month: 'MMM yyyy',
+              year: 'yyyy'
+            }
           },
           ticks: {
             ...BASE_OPTIONS.scales.x.ticks,

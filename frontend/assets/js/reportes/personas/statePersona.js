@@ -29,6 +29,9 @@ let modoActual = MODOS[0];
 let personaActual = null;         // personaId
 let kpiActual = 'importe';
 
+// 🔑 NUEVO: periodo actual para Personas
+let periodoActual = 'mes';        // 'dia' | 'semana' | 'mes'
+
 let ultimoResultado = null;
 
 /* ─────────────────────────────
@@ -41,6 +44,9 @@ export const getModoActual = () => modoActual;
 export const getPersonaActual = () => personaActual;
 export const getKpiActual = () => kpiActual;
 
+// 🔑 NUEVO
+export const getPeriodoActual = () => periodoActual;
+
 export const getUltimoResultado = () => ultimoResultado;
 
 /* ─────────────────────────────
@@ -52,11 +58,17 @@ export const setModoActual = v => {
 
 export const setPersonaActual = personaId => {
   personaActual = personaId;
-  console.log('[STATE] personaActual ahora ->', personaActual);
+  console.log('[STATE Persona] personaActual ->', personaActual);
 };
 
 export const setKpiActual = kpi => {
   kpiActual = kpi;
+};
+
+// 🔑 NUEVO
+export const setPeriodoActual = periodo => {
+  periodoActual = periodo;
+  console.log('[STATE Persona] periodoActual ->', periodoActual);
 };
 
 export const setUltimoResultado = v => {
@@ -70,6 +82,7 @@ export function resetPersonas() {
   dataPorPersona = {};
   personasDisponibles = [];
   personaActual = null;
+  periodoActual = 'mes';
 }
 
 export function setPersonasData({ data, personas }) {
