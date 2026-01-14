@@ -9,6 +9,7 @@ from backend.db.mongo.reportes.filtros import (
 from backend.services.reportes.data.queries import (
     cargar_devoluciones_detalle,
 )
+
 from backend.services.reportes.data.dataframe import (
     obtener_dataframe,
 )
@@ -36,8 +37,9 @@ from backend.services.reportes.aggregations.general import (
 from backend.services.reportes.personas import (
     agrupar_por_persona,          # TABLA / RESUMEN
 )
+
 from backend.services.reportes.personas.agrupacion import (
-    agrupar_personas_por_fecha,   # 📈 SERIES (NUEVO)
+    agrupar_personas_por_fecha,   # 📈 SERIES
 )
 
 # ─── TEMPORAL ─────────────────────────────────────────
@@ -91,7 +93,7 @@ class ReportesService:
         if raw is None or raw.empty:
             return self._resultado_vacio(kpis, desde, hasta, agrupar)
 
-        # ─── Dimensiones
+        # ─── Dimensiones (LECTURA PURA)
         asignaciones = self.reportes_queries.asignaciones_personal()
         personas_map = self.reportes_queries.personas_activas()
 
@@ -111,7 +113,10 @@ class ReportesService:
         df = normalizar_tipos(df)
 
         df["devoluciones"] = df.get("devoluciones", 1)
-        df["persona_nombre"] = df.get("persona_nombre", "Sin asignación").fillna("Sin asignación")
+        df["persona_nombre"] = (
+            df.get("persona_nombre", "Sin asignación")
+              .fillna("Sin asignación")
+        )
 
         # ─── KPIs globales
         resumen = {
@@ -120,7 +125,7 @@ class ReportesService:
             "devoluciones_total": int(df["devoluciones"].sum()) if kpis.get("devoluciones") else 0,
         }
 
-        # ─── GENERAL (serie con personas por punto)
+        # ─── GENERAL (serie temporal)
         periodo = map_periodo(agrupar)
 
         if periodo == "dia":
@@ -150,20 +155,23 @@ class ReportesService:
         por_zona = agrupa_por_zona(df, kpis)
         por_pasillo = agrupa_por_pasillo(df, kpis)
 
-        # ─── RESULTADO FINAL
+        # ─── RESULTADO FINAL (CONTRATO FRONTEND)
         return {
             "kpis": kpis,
             "resumen": resumen,
+
             "general": {
                 "periodo": periodo,
                 "serie": general,
             },
+
             "por_zona": por_zona,
             "por_pasillo": por_pasillo,
 
-            # 🔑 PERSONAS
-            "por_persona": por_persona,              # tablas
-            "personas_series": personas_series,      # 📈 gráficas
+            # 🔑 PERSONAS (CLAVE PARA UI)
+            "personas": personas_map,          # 👈 MAPA id → nombre
+            "por_persona": por_persona,        # tablas / resumen
+            "personas_series": personas_series,
 
             "tabla": tabla_final(df),
         }
@@ -173,7 +181,11 @@ class ReportesService:
     # ─────────────────────────────
     def _normalizar_kpis(self, kpis):
         if not kpis:
-            return {"importe": True, "piezas": True, "devoluciones": True}
+            return {
+                "importe": True,
+                "piezas": True,
+                "devoluciones": True,
+            }
         return {
             "importe": bool(kpis.get("importe", True)),
             "piezas": bool(kpis.get("piezas", True)),
@@ -201,6 +213,7 @@ class ReportesService:
             },
             "por_zona": {},
             "por_pasillo": {},
+            "personas": {},
             "por_persona": {},
             "personas_series": {},
             "tabla": [],
@@ -213,6 +226,7 @@ class ReportesService:
             "general": None,
             "por_zona": {},
             "por_pasillo": {},
+            "personas": {},
             "por_persona": {},
             "personas_series": {},
             "tabla": [],

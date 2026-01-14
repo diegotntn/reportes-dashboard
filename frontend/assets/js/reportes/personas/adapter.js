@@ -25,7 +25,7 @@ function toNumberSeguro(v) {
 }
 
 function normalizarKPIs(row) {
-  const kpis = {
+  return {
     importe: toNumberSeguro(
       row.importe ??
       row.importe_total ??
@@ -44,13 +44,6 @@ function normalizarKPIs(row) {
       row.total_devoluciones
     )
   };
-
-  console.log('[ADAPTER][normalizarKPIs]', {
-    row,
-    kpisNormalizados: kpis
-  });
-
-  return kpis;
 }
 
 /* ======================================================
@@ -62,14 +55,17 @@ export function adaptarDatosPersonas(resultado) {
 
   resetPersonas();
 
-  const bruto = resultado?.por_persona || {};
+  const bruto = resultado?.por_persona ?? {};
+  const mapaPersonas = resultado?.personas ?? {};
+
   const data = {};
   const personas = [];
 
   const periodo = normalizarPeriodo(resultado?.agrupar);
 
   console.log('periodo normalizado:', periodo);
-  console.log('personas en bruto:', Object.keys(bruto));
+  console.log('personas recibidas:', mapaPersonas);
+  console.log('personas con datos:', Object.keys(bruto));
 
   Object.entries(bruto).forEach(([personaId, bloque]) => {
     console.group(`[Persona ${personaId}]`);
@@ -80,32 +76,14 @@ export function adaptarDatosPersonas(resultado) {
       return;
     }
 
-    const nombre =
-      bloque.resumen?.nombre ||
-      bloque.resumen?.persona ||
-      personaId;
-
-    console.log('nombre:', nombre);
-    console.log('ejemplo row backend:', bloque.tabla[0]);
+    const nombre = mapaPersonas[personaId] ?? personaId;
 
     personas.push(personaId);
 
-    const serie = bloque.tabla.map((row, i) => {
-      const periodoRow = row.periodo ?? row.fecha ?? null;
-      const kpis = normalizarKPIs(row);
-
-      if (i === 0) {
-        console.log('[SERIE MAP]', {
-          periodoRow,
-          kpis
-        });
-      }
-
-      return {
-        periodo: periodoRow,
-        kpis
-      };
-    });
+    const serie = bloque.tabla.map(row => ({
+      periodo: row.periodo ?? row.fecha ?? null,
+      kpis: normalizarKPIs(row)
+    }));
 
     data[personaId] = {
       id: personaId,
@@ -125,6 +103,11 @@ export function adaptarDatosPersonas(resultado) {
   console.log('[Personas][Adapter] personas finales:', personas);
   console.log('[Personas][Adapter] data final:', data);
 
-  setPersonasData({ data, personas });
+  setPersonasData({
+    data,
+    personas,
+    mapaPersonas   // 🔑 opcional pero útil globalmente
+  });
+
   console.groupEnd();
 }

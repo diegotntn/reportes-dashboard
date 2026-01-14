@@ -13,3 +13,12 @@ def cargar_asignaciones_activas(reportes_queries, desde, hasta):
         desde=desde,
         hasta=hasta
     )
+
+def cargar_personas_activas(reportes_queries):
+    """
+    Devuelve el mapa de personas activas.
+
+    RETURN:
+    { persona_id: nombre }
+    """
+    return reportes_queries.personas_activas()
