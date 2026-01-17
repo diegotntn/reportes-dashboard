@@ -106,7 +106,13 @@ function renderGeneral(resultado) {
       }
     }));
 
-
+    console.table(
+  serieFiltrada.map(p => ({
+    key: p.key,
+    fecha: p.fecha,
+    periodo: general.periodo
+  }))
+);
     // Llamada CORREGIDA a la nueva API de charts.js
     renderLineChart(
       canvas,
@@ -195,20 +201,27 @@ function convertirKeyAFecha(key, periodo) {
     return new Date(y, m - 1, d);
   }
 
+  // semana: YYYY-MM-DD (inicio de semana)
+  if (periodo === 'semana') {
+    const [y, m, d] = key.split('-').map(Number);
+    return new Date(y, m - 1, d);
+  }
+
   // mes: YYYY-MM
   if (periodo === 'mes') {
     const [y, m] = key.split('-').map(Number);
     return new Date(y, m - 1, 1);
   }
 
-  // semana: YYYY-Www
-  if (periodo === 'semana') {
-    const [y, w] = key.split('-W').map(Number);
-    return isoWeekToDate(y, w);
+  // anio: YYYY
+  if (periodo === 'anio') {
+    const y = Number(key);
+    return new Date(y, 0, 1);
   }
 
   return null;
 }
+
 
 // helper ISO (idéntico al que ya usas)
 function isoWeekToDate(y, w) {
