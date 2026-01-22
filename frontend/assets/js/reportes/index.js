@@ -16,16 +16,15 @@
 
 // ─────────────────────────────
 // IMPORTS DE VISTAS
-// (registran listeners globales)
 // ─────────────────────────────
 
-// ⛔ Vistas legacy (siguen usando eventos globales)
+// Vistas legacy (event-driven)
 import './general.js';
 import './pasillos.js';
 import './zonas.js';
 import './detalle.js';
 
-// ✅ Personas (nueva arquitectura)
+// Personas (arquitectura nueva)
 import { cargarResultadoPersonas } from './personas/index.js';
 
 // Infraestructura
@@ -33,25 +32,22 @@ import { generarReporte } from '../api.js';
 import { iniciarTabsReportes } from '../router.js';
 
 /* ======================================================
-   ESTADO ÚNICO (fuente de verdad del dashboard)
+   ESTADO ÚNICO (fuente de verdad)
 ====================================================== */
 let resultadoActual = null;
 let filtrosActuales = null;
 let inicializado = false;
 
-// 🔒 Candado de concurrencia
+// Candado de concurrencia
 let cargando = false;
 
 /* ======================================================
    ENTRY POINT
 ====================================================== */
 export function renderReportesScreen(container) {
-  console.group('🟢 ReportesScreen init');
-
-  // Estado inicial
   filtrosActuales = filtrosPorDefecto();
 
-  // HTML base (SE MONTA UNA SOLA VEZ)
+  // HTML base (se monta una sola vez)
   container.innerHTML = `
     <section class="card reportes-screen">
 
@@ -59,10 +55,8 @@ export function renderReportesScreen(container) {
         <h2>Reportes</h2>
       </header>
 
-      <!-- Filtros -->
       <section id="filters-container"></section>
 
-      <!-- Tabs -->
       <nav class="tabs">
         <button data-tab="general" class="active">General</button>
         <button data-tab="pasillos">Pasillos</button>
@@ -71,7 +65,6 @@ export function renderReportesScreen(container) {
         <button data-tab="detalle">Detalle</button>
       </nav>
 
-      <!-- Paneles -->
       <section id="tab-general" class="tab-panel"></section>
       <section id="tab-pasillos" class="tab-panel" style="display:none"></section>
       <section id="tab-personas" class="tab-panel" style="display:none"></section>
@@ -81,23 +74,15 @@ export function renderReportesScreen(container) {
     </section>
   `;
 
-  console.log('📦 DOM base de Reportes creado');
-
-  // Inicializaciones
   initFiltros();
   initEventosGlobales();
 
-  // Router de tabs (solo visibilidad)
   iniciarTabsReportes('general');
 
-  // Fetch inicial (UNA sola vez)
   if (!inicializado) {
     inicializado = true;
     actualizarReportes();
-    console.log('📡 Fetch inicial de reportes');
   }
-
-  console.groupEnd();
 }
 
 /* ======================================================
@@ -136,12 +121,10 @@ function initFiltros() {
 
   const form = container.querySelector('#reportes-filters');
 
-  // Valores iniciales
   form.desde.value = filtrosActuales.desde;
   form.hasta.value = filtrosActuales.hasta;
   form.agrupar.value = filtrosActuales.agrupar;
 
-  // Submit explícito
   form.addEventListener('submit', e => {
     e.preventDefault();
 
@@ -158,7 +141,6 @@ function initFiltros() {
    EVENTOS GLOBALES
 ====================================================== */
 function initEventosGlobales() {
-  // Cambio de agrupación disparado por vistas legacy
   window.addEventListener('reportes:cambiar-agrupacion', e => {
     const agrupar = e.detail?.agrupar;
     if (!agrupar || agrupar === filtrosActuales.agrupar) return;
@@ -173,13 +155,10 @@ function initEventosGlobales() {
 }
 
 /* ======================================================
-   API (fetch + distribución de resultados)
+   API (fetch + distribución)
 ====================================================== */
 async function actualizarReportes() {
-  if (cargando) {
-    console.warn('⏸️ Reportes en carga, se ignora llamada duplicada');
-    return;
-  }
+  if (cargando) return;
 
   cargando = true;
 
@@ -187,18 +166,15 @@ async function actualizarReportes() {
     resultadoActual = await generarReporte(filtrosActuales);
     if (!resultadoActual) return;
 
-    // 🔔 Vistas legacy (event-driven)
+    // Vistas legacy
     window.dispatchEvent(
       new CustomEvent('reportes:actualizados', {
         detail: resultadoActual
       })
     );
 
-    // ✅ Personas (API directa, arquitectura nueva)
+    // Personas
     cargarResultadoPersonas(resultadoActual);
-
-  } catch (err) {
-    console.error('❌ Error al generar reportes', err);
 
   } finally {
     cargando = false;
@@ -220,7 +196,7 @@ function filtrosPorDefecto() {
 }
 
 /* ======================================================
-   ACCESO CONTROLADO AL ESTADO (solo lectura)
+   ACCESO SOLO LECTURA AL ESTADO
 ====================================================== */
 export function getResultadoActual() {
   return resultadoActual;
